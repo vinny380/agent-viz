@@ -25,10 +25,12 @@ const PHASE_LABEL: Record<Phase, string> = {
 
 const FONT = { fontFamily: "monospace", fill: DMG_DARK } as const;
 
-// Sprite geometry tuned for the 320x288 LCD. The sprite is ~32px tall at
-// scale 1.0; the ring is centered on its mid-height.
-const RING_CY = -16;
-const RING_R = 18;
+// Sprite geometry tuned for the 320x288 LCD (downscaled into a small physical
+// screen, so the characters are drawn large). Sprite ~48px tall at scale 1.5;
+// the phase ring is centered on its mid-height.
+const SPRITE_SCALE = 1.5;
+const RING_CY = -24;
+const RING_R = 24;
 
 interface CharView {
   root: Container;
@@ -111,12 +113,12 @@ export class Scene {
     const w = this.app.renderer.width, h = this.app.renderer.height;
     const roots = Object.values(world.agents).filter((a) => a.parentId === null);
     roots.forEach((r, i) => {
-      pos.set(r.agentId, { x: w / 2, y: h * 0.32 + i * 14 });
+      pos.set(r.agentId, { x: w / 2, y: h * 0.34 + i * 16 });
       const kids = Object.values(world.agents).filter((a) => a.parentId === r.agentId);
       kids.forEach((k, j) => {
         // Fan up to ~3 children across the width without overflowing 320px.
-        const spread = (j - (kids.length - 1) / 2) * 90;
-        pos.set(k.agentId, { x: w / 2 + spread, y: h * 0.78 });
+        const spread = (j - (kids.length - 1) / 2) * 92;
+        pos.set(k.agentId, { x: w / 2 + spread, y: h * 0.82 });
       });
     });
     // any deeper descendants: stack just below their parent if known
@@ -138,22 +140,22 @@ export class Scene {
 
     const sprite = new Sprite(this.textures.get(agent.agentId)!);
     sprite.anchor.set(0.5, 1);
-    sprite.scale.set(1);
+    sprite.scale.set(SPRITE_SCALE);
 
     const ring = new Graphics();
     const gauge = new Graphics();
 
-    const nameText = new Text({ text: agent.label, style: { ...FONT, fontSize: 9, fontWeight: "bold" } });
+    const nameText = new Text({ text: agent.label, style: { ...FONT, fontSize: 13, fontWeight: "bold" } });
     nameText.anchor.set(0.5, 1);
-    nameText.y = -38;
+    nameText.y = -56;
 
-    const phaseText = new Text({ text: "", style: { ...FONT, fontSize: 9 } });
+    const phaseText = new Text({ text: "", style: { ...FONT, fontSize: 12, fontWeight: "bold" } });
     phaseText.anchor.set(0.5, 0);
-    phaseText.y = 4;
+    phaseText.y = 6;
 
-    const stepText = new Text({ text: "", style: { ...FONT, fontSize: 8, fill: DMG_MID } });
+    const stepText = new Text({ text: "", style: { ...FONT, fontSize: 10, fill: DMG_MID } });
     stepText.anchor.set(0.5, 0);
-    stepText.y = 15;
+    stepText.y = 22;
 
     // Minimal in-LCD bubble: shows only the current tool name / short glyph,
     // capped narrow so it never overflows the 320px screen. Detailed text
@@ -161,10 +163,10 @@ export class Scene {
     const bubble = new Container();
     const bubbleBg = new Graphics();
     bubble.addChild(bubbleBg);
-    const bubbleText = new Text({ text: "", style: { ...FONT, fontSize: 8, fill: DMG_DARK } });
-    bubbleText.x = 4; bubbleText.y = 2;
+    const bubbleText = new Text({ text: "", style: { ...FONT, fontSize: 11, fill: DMG_DARK } });
+    bubbleText.x = 6; bubbleText.y = 3;
     bubble.addChild(bubbleText);
-    bubble.x = 12; bubble.y = -52;
+    bubble.x = 16; bubble.y = -74;
     bubble.visible = false;
     (bubble as { __bg?: Graphics }).__bg = bubbleBg;
 
@@ -224,10 +226,10 @@ export class Scene {
       if (v.bubble.visible) {
         v.bubbleText.text = bubbleStr;
         const bg = (v.bubble as { __bg?: Graphics }).__bg!;
-        const bw = Math.min(96, Math.max(28, v.bubbleText.width + 8));
-        const bh = v.bubbleText.height + 4;
+        const bw = Math.min(150, Math.max(36, v.bubbleText.width + 12));
+        const bh = v.bubbleText.height + 6;
         bg.clear();
-        bg.roundRect(0, 0, bw, bh, 2).fill({ color: DMG_LIGHTEST, alpha: 0.95 }).stroke({ color: DMG_DARK, width: 1 });
+        bg.roundRect(0, 0, bw, bh, 3).fill({ color: DMG_LIGHTEST, alpha: 0.95 }).stroke({ color: DMG_DARK, width: 1 });
       }
     }
 
@@ -277,7 +279,7 @@ export class Scene {
         const angle = (this.tick % 90) / 90 * Math.PI * 2;
         const cx = Math.cos(angle) * RING_R;
         const cy = RING_CY + Math.sin(angle) * RING_R;
-        v.gauge.circle(cx, cy, 2.5).fill(DMG_DARK);
+        v.gauge.circle(cx, cy, 3.5).fill(DMG_DARK);
       }
 
       // Sprite fade/scale for subagents: portal scale-in, then dim once returned.
@@ -366,7 +368,7 @@ export class Scene {
       const k = token.ms / TOKEN_MS; // 0 (at child) → 1 (at parent)
       const x = c.x + (p.x - c.x) * k;
       const y = (c.y + RING_CY) + ((p.y + RING_CY) - (c.y + RING_CY)) * k;
-      this.fx.rect(x - 2, y - 2, 4, 4).fill(DMG_DARK);
+      this.fx.rect(x - 2.5, y - 2.5, 5, 5).fill(DMG_DARK);
     }
   }
 

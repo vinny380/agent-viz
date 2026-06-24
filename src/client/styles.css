@@ -8,10 +8,10 @@
 :root {
   /* LCD screen rectangle within public/gameboy.png, as fractions of the image.
      Tune the whole screen placement here, in one place. */
-  --lcd-left: 37%;
-  --lcd-top: 21.5%;
-  --lcd-w: 35%;
-  --lcd-h: 23%;
+  --lcd-left: 39.3%;
+  --lcd-top: 20.4%;
+  --lcd-w: 31.6%;
+  --lcd-h: 25%;
 
   --gb-aspect: 907 / 1100;
 
@@ -79,6 +79,13 @@ body {
   height: var(--lcd-h);
   background: var(--lcd-green);
   overflow: hidden;
+  /* The DMG glass has gently rounded corners (a touch more at the bottom). */
+  border-radius: 5px 5px 9px 9px;
+  /* Recessed-glass depth: thin inner rim + soft inner shadow top & bottom. */
+  box-shadow:
+    inset 0 0 0 1px rgba(15, 56, 15, 0.35),
+    inset 0 2px 10px rgba(15, 56, 15, 0.5),
+    inset 0 -3px 9px rgba(15, 56, 15, 0.32);
 }
 
 #screen canvas {
@@ -86,6 +93,19 @@ body {
   height: 100%;
   image-rendering: pixelated;
   display: block;
+}
+
+/* Glass sheen + faint edge vignette so the lit LCD reads as recessed glass,
+   not a sticker pasted on the body. Sits above the canvas; never blocks input. */
+#screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(133deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 38%),
+    radial-gradient(135% 115% at 50% 0%, rgba(0, 0, 0, 0) 60%, rgba(15, 56, 15, 0.3) 100%);
 }
 
 /* ── MIND LOG: a CRT terminal panel to the right of the console. ───────────── */
