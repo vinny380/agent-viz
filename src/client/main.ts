@@ -1,6 +1,7 @@
 import { Application } from "pixi.js";
 import { Scene } from "./scene";
 import { connect } from "./net";
+import { createMindLog } from "./mindlog";
 import { initialWorld, reduce, type WorldState } from "./store";
 
 const WS_URL = "ws://localhost:8787";
@@ -13,12 +14,18 @@ async function main() {
   document.getElementById("screen")!.appendChild(app.canvas);
 
   const scene = new Scene(app);
+
+  // CRT terminal transcript beside the Game Boy (colour lives here, outside the LCD).
+  const mindlog = createMindLog(document.getElementById("mindlog")!);
+
   let world: WorldState = initialWorld();
   scene.setWorld(world);
+  mindlog.render(world);
 
   const net = connect(WS_URL, (event) => {
     world = reduce(world, event);
     scene.setWorld(world);
+    mindlog.render(world);
   });
 
   // Quest prompt bar (lives in the page layout; keep the same startRun behavior).
