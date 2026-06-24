@@ -1,0 +1,29 @@
+{
+  "name": "agent-quest",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n client,server -c blue,green \"npm:dev:client\" \"npm:dev:server\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch src/runner/server.ts",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.70.0",
+    "dotenv": "^16.4.5",
+    "pixi-filters": "^6.0.0",
+    "pixi.js": "^8.6.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "concurrently": "^9.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.0"
+  }
+}
