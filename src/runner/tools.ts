@@ -69,6 +69,19 @@ const EXECUTORS: Record<string, ToolExecutor> = {
       return { ok: false, preview: `error: ${msg}`, resultForModel: `Error: ${msg}` };
     }
   },
+
+  async spawn_subagent(input, ctx) {
+    try {
+      const task = String(input?.task ?? "");
+      const role = String(input?.role ?? "scout");
+      if (!task) throw new Error("task is required");
+      const result = await ctx.spawn(task, role);
+      return { ok: true, preview: preview(result), resultForModel: result };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, preview: `error: ${msg}`, resultForModel: `Error: ${msg}` };
+    }
+  },
 };
 
 const DEFS: ModelToolDef[] = [
@@ -93,6 +106,18 @@ const DEFS: ModelToolDef[] = [
       type: "object",
       properties: { path: { type: "string", description: "relative path inside the sandbox" } },
       required: ["path"],
+    },
+  },
+  {
+    name: "spawn_subagent",
+    description: "Delegate a focused subtask to a new subagent. Use for independent or parallelizable work. Returns the subagent's final report.",
+    input_schema: {
+      type: "object",
+      properties: {
+        task: { type: "string", description: "the subtask for the subagent to complete" },
+        role: { type: "string", description: "short label for the subagent, e.g. 'scout' or 'mathematician'" },
+      },
+      required: ["task"],
     },
   },
 ];
