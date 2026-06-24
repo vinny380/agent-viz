@@ -3,19 +3,32 @@ import { CRTFilter } from "pixi-filters";
 import { makeSpriteTexture } from "./sprites";
 import type { WorldState, AgentState, Phase } from "./store";
 
+// Authentic Game Boy DMG ramp (darkest → lightest).
+const DMG_DARK = 0x0f380f; // outlines, active, text, tethers
+const DMG_MID = 0x306230; // secondary / idle / grid
+const DMG_LIGHT = 0x8bac0f; // faint grid, dim accents
+const DMG_LIGHTEST = 0x9bbc0f; // LCD backdrop
+
+// The LCD is monochrome: phase is read from the LABEL + animation, not hue.
+// Active phases use the darkest green; idle/terminal states use the mid green.
 const PHASE_COLOR: Record<Phase, number> = {
-  idle: 0x6b7280,
-  thinking: 0x9b59b6,
-  acting: 0x48c9b0,
-  observing: 0xf1c40f,
-  finished: 0x2ecc71,
-  error: 0xe74c3c,
+  idle: DMG_MID,
+  thinking: DMG_DARK,
+  acting: DMG_DARK,
+  observing: DMG_DARK,
+  finished: DMG_MID,
+  error: DMG_DARK,
 };
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "IDLE", thinking: "THINK", acting: "ACT", observing: "OBSERVE", finished: "DONE", error: "ERROR",
 };
 
-const FONT = { fontFamily: "monospace", fill: 0xffffff } as const;
+const FONT = { fontFamily: "monospace", fill: DMG_DARK } as const;
+
+// Sprite geometry tuned for the 320x288 LCD. The sprite is ~32px tall at
+// scale 1.0; the ring is centered on its mid-height.
+const RING_CY = -16;
+const RING_R = 18;
 
 interface CharView {
   root: Container;
@@ -44,8 +57,8 @@ export class Scene {
     this.world.addChild(this.tethers);
     app.stage.addChild(this.world);
 
-    // 90s CRT vibe
-    app.stage.filters = [new CRTFilter({ curvature: 6, lineWidth: 2, lineContrast: 0.35, vignetting: 0.3, noise: 0.08 })];
+    // Subtle CRT vibe; gentle so the green LCD stays readable at 320x288.
+    app.stage.filters = [new CRTFilter({ curvature: 3, lineWidth: 1, lineContrast: 0.2, vignetting: 0.2, noise: 0.04 })];
 
     this.drawBackdrop();
     app.ticker.add(() => { this.tick += 1; this.animate(); });
@@ -54,31 +67,32 @@ export class Scene {
   private drawBackdrop() {
     const bg = new Graphics();
     const w = this.app.renderer.width, h = this.app.renderer.height;
-    bg.rect(0, 0, w, h).fill(0x0a0f1c);
-    const grid = 32;
-    for (let x = 0; x <= w; x += grid) bg.rect(x, 0, 1, h).fill({ color: 0x14306b, alpha: 0.35 });
-    for (let y = 0; y <= h; y += grid) bg.rect(0, y, w, 1).fill({ color: 0x14306b, alpha: 0.35 });
+    bg.rect(0, 0, w, h).fill(DMG_LIGHTEST);
+    const grid = 16;
+    for (let x = 0; x <= w; x += grid) bg.rect(x, 0, 1, h).fill({ color: DMG_LIGHT, alpha: 0.4 });
+    for (let y = 0; y <= h; y += grid) bg.rect(0, y, w, 1).fill({ color: DMG_LIGHT, alpha: 0.4 });
     this.world.addChildAt(bg, 0);
   }
 
-  /** Lay agents out: root centered, children fanned beneath their parent. */
+  /** Lay agents out for a 320x288 LCD: root near the top, children fanned beneath. */
   private layout(world: WorldState): Map<string, { x: number; y: number }> {
     const pos = new Map<string, { x: number; y: number }>();
     const w = this.app.renderer.width, h = this.app.renderer.height;
     const roots = Object.values(world.agents).filter((a) => a.parentId === null);
     roots.forEach((r, i) => {
-      pos.set(r.agentId, { x: w / 2, y: h / 2 - 60 + i * 20 });
+      pos.set(r.agentId, { x: w / 2, y: h * 0.32 + i * 14 });
       const kids = Object.values(world.agents).filter((a) => a.parentId === r.agentId);
       kids.forEach((k, j) => {
-        const spread = (j - (kids.length - 1) / 2) * 220;
-        pos.set(k.agentId, { x: w / 2 + spread, y: h / 2 + 150 });
+        // Fan up to ~3 children across the width without overflowing 320px.
+        const spread = (j - (kids.length - 1) / 2) * 90;
+        pos.set(k.agentId, { x: w / 2 + spread, y: h * 0.78 });
       });
     });
-    // any deeper descendants: stack below their parent if known
+    // any deeper descendants: stack just below their parent if known
     for (const a of Object.values(world.agents)) {
       if (!pos.has(a.agentId) && a.parentId && pos.has(a.parentId)) {
         const p = pos.get(a.parentId)!;
-        pos.set(a.agentId, { x: p.x, y: p.y + 160 });
+        pos.set(a.agentId, { x: p.x, y: Math.min(h - 24, p.y + 70) });
       }
     }
     return pos;
@@ -93,32 +107,35 @@ export class Scene {
 
     const sprite = new Sprite(this.textures.get(agent.agentId)!);
     sprite.anchor.set(0.5, 1);
-    sprite.scale.set(2);
+    sprite.scale.set(1);
 
     const ring = new Graphics();
     const gauge = new Graphics();
 
-    const nameText = new Text({ text: agent.label, style: { ...FONT, fontSize: 14, fontWeight: "bold" } });
+    const nameText = new Text({ text: agent.label, style: { ...FONT, fontSize: 9, fontWeight: "bold" } });
     nameText.anchor.set(0.5, 1);
-    nameText.y = -120;
+    nameText.y = -38;
 
-    const phaseText = new Text({ text: "", style: { ...FONT, fontSize: 11 } });
+    const phaseText = new Text({ text: "", style: { ...FONT, fontSize: 9 } });
     phaseText.anchor.set(0.5, 0);
-    phaseText.y = 8;
+    phaseText.y = 4;
 
-    const stepText = new Text({ text: "", style: { ...FONT, fontSize: 10, fill: 0x9bd0ff } });
+    const stepText = new Text({ text: "", style: { ...FONT, fontSize: 8, fill: DMG_MID } });
     stepText.anchor.set(0.5, 0);
-    stepText.y = 22;
+    stepText.y = 15;
 
+    // Minimal in-LCD bubble: shows only the current tool name / short glyph,
+    // capped narrow so it never overflows the 320px screen. Detailed text
+    // lives in the MIND LOG outside the LCD.
     const bubble = new Container();
     const bubbleBg = new Graphics();
     bubble.addChild(bubbleBg);
-    const bubbleText = new Text({ text: "", style: { ...FONT, fontSize: 11, wordWrap: true, wordWrapWidth: 200, fill: 0x101418 } });
-    bubbleText.x = 8; bubbleText.y = 6;
+    const bubbleText = new Text({ text: "", style: { ...FONT, fontSize: 8, fill: DMG_DARK } });
+    bubbleText.x = 4; bubbleText.y = 2;
     bubble.addChild(bubbleText);
-    bubble.x = 24; bubble.y = -150;
+    bubble.x = 12; bubble.y = -52;
     bubble.visible = false;
-    (bubble as any).__bg = bubbleBg;
+    (bubble as { __bg?: Graphics }).__bg = bubbleBg;
 
     root.addChild(ring, gauge, sprite, nameText, phaseText, stepText, bubble);
     this.world.addChild(root);
@@ -131,47 +148,45 @@ export class Scene {
   render(world: WorldState) {
     const pos = this.layout(world);
 
-    // tethers parent → child
+    // tethers parent → child, in DMG dark green
     this.tethers.clear();
     for (const a of Object.values(world.agents)) {
       if (a.parentId && pos.has(a.parentId) && pos.has(a.agentId)) {
         const p = pos.get(a.parentId)!, c = pos.get(a.agentId)!;
-        this.tethers.moveTo(p.x, p.y).lineTo(c.x, c.y).stroke({ color: 0x48c9b0, width: 2, alpha: 0.5 });
+        this.tethers.moveTo(p.x, p.y).lineTo(c.x, c.y).stroke({ color: DMG_DARK, width: 1, alpha: 0.5 });
       }
     }
 
     for (const agent of Object.values(world.agents)) {
       const v = this.ensureView(agent);
-      const p = pos.get(agent.agentId) ?? { x: 100, y: 100 };
+      const p = pos.get(agent.agentId) ?? { x: 32, y: 32 };
       v.root.x = p.x; v.root.y = p.y;
 
       const color = PHASE_COLOR[agent.phase];
-      v.sprite.tint = agent.phase === "idle" ? 0x8899aa : 0xffffff;
+      // Monochrome LCD: dim idle sprites toward the mid green, keep others crisp.
+      v.sprite.tint = agent.phase === "idle" ? DMG_MID : 0xffffff;
 
-      // phase ring
+      // phase ring (DMG green)
       v.ring.clear();
-      v.ring.circle(0, -40, 46).stroke({ color, width: 3, alpha: 0.8 });
+      v.ring.circle(0, RING_CY, RING_R).stroke({ color, width: 2, alpha: 0.85 });
 
       v.phaseText.text = PHASE_LABEL[agent.phase];
       v.phaseText.style.fill = color;
       v.stepText.text = agent.step > 0 ? `STEP ${agent.step}` : "";
 
-      // bubble shows live thinking, else current tool, else final text
+      // Bubble shows only the active tool name (narrow), nothing else.
       let bubbleStr = "";
-      if (agent.phase === "thinking" && agent.thinkingText) bubbleStr = agent.thinkingText.slice(-180);
-      else if (agent.phase === "acting" && agent.currentTool) bubbleStr = `⚙ ${agent.currentTool.name}(${preview(agent.currentTool.input)})`;
-      else if (agent.phase === "observing" && agent.currentTool) bubbleStr = `← ${agent.currentTool.preview ?? ""}`;
-      else if (agent.phase === "finished" && agent.finalText) bubbleStr = agent.finalText.slice(0, 180);
-      else if (agent.phase === "error" && agent.error) bubbleStr = `✖ ${agent.error}`;
+      if (agent.phase === "acting" && agent.currentTool) bubbleStr = clip(agent.currentTool.name, 12);
+      else if (agent.phase === "observing" && agent.currentTool) bubbleStr = clip(agent.currentTool.name, 12);
 
       v.bubble.visible = bubbleStr.length > 0;
       if (v.bubble.visible) {
         v.bubbleText.text = bubbleStr;
-        const bg = (v.bubble as any).__bg as Graphics;
-        const w = Math.min(216, Math.max(80, v.bubbleText.width + 16));
-        const h = v.bubbleText.height + 12;
+        const bg = (v.bubble as { __bg?: Graphics }).__bg!;
+        const bw = Math.min(96, Math.max(28, v.bubbleText.width + 8));
+        const bh = v.bubbleText.height + 4;
         bg.clear();
-        bg.roundRect(0, 0, w, h, 6).fill({ color: 0xeef6ff, alpha: 0.95 }).stroke({ color, width: 2 });
+        bg.roundRect(0, 0, bw, bh, 2).fill({ color: DMG_LIGHTEST, alpha: 0.95 }).stroke({ color: DMG_DARK, width: 1 });
       }
     }
 
@@ -181,7 +196,7 @@ export class Scene {
     }
   }
 
-  /** Per-frame loop gauge: a marker orbiting each character, one lap suggesting one ReAct step. */
+  /** Per-frame loop gauge: a marker orbiting each active character (one lap ≈ one ReAct step). */
   private animate() {
     for (const [id, v] of this.views) {
       const a = (this.lastWorld?.agents ?? {})[id];
@@ -189,9 +204,9 @@ export class Scene {
       v.gauge.clear();
       if (!active) continue;
       const angle = (this.tick % 90) / 90 * Math.PI * 2;
-      const cx = Math.cos(angle) * 46;
-      const cy = -40 + Math.sin(angle) * 46;
-      v.gauge.circle(cx, cy, 5).fill(PHASE_COLOR[a!.phase]);
+      const cx = Math.cos(angle) * RING_R;
+      const cy = RING_CY + Math.sin(angle) * RING_R;
+      v.gauge.circle(cx, cy, 2.5).fill(DMG_DARK);
     }
   }
 
@@ -199,7 +214,7 @@ export class Scene {
   setWorld(world: WorldState) { this.lastWorld = world; this.render(world); }
 }
 
-function preview(input: unknown): string {
-  const s = typeof input === "string" ? input : JSON.stringify(input);
-  return s.length > 40 ? s.slice(0, 40) + "…" : s;
+/** Clip a string to a narrow cap so it fits the 320px LCD. */
+function clip(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }

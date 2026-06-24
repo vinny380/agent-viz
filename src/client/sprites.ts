@@ -1,7 +1,9 @@
 import { Application, Graphics, Texture } from "pixi.js";
 import { spriteMatrix, paletteFor } from "./sprite-data";
 
-const CELL = 6; // each sprite pixel → 6 screen px before scene scaling
+// Each sprite pixel → 2 screen px. With the 16-row matrix and scene scale ~1.0
+// this yields a ~32px-tall sprite, sized for the 320x288 Game Boy LCD.
+const CELL = 2;
 
 export function makeSpriteTexture(app: Application, agentId: string): Texture {
   const matrix = spriteMatrix(agentId);
