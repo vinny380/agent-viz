@@ -6,9 +6,11 @@ import { initialWorld, reduce, type WorldState } from "./store";
 const WS_URL = "ws://localhost:8787";
 
 async function main() {
+  // Fixed internal resolution: the 320x288 buffer is stretched to fill the
+  // Game Boy's LCD by CSS (image-rendering: pixelated) for chunky pixels.
   const app = new Application();
-  await app.init({ resizeTo: window, background: 0x05030a, antialias: false });
-  document.getElementById("app")!.appendChild(app.canvas);
+  await app.init({ width: 320, height: 288, background: "#9bbc0f", antialias: false });
+  document.getElementById("screen")!.appendChild(app.canvas);
 
   const scene = new Scene(app);
   let world: WorldState = initialWorld();
@@ -19,20 +21,20 @@ async function main() {
     scene.setWorld(world);
   });
 
-  // prompt input
-  const bar = document.createElement("div");
-  bar.style.cssText = "position:fixed;left:0;right:0;bottom:0;display:flex;gap:8px;padding:10px;background:#0a0f1ccc;font-family:monospace;z-index:10";
-  const input = document.createElement("input");
-  input.placeholder = "Give the hero a quest… (e.g. 'Read README.txt and tell me where the treasure is')";
-  input.style.cssText = "flex:1;padding:10px;background:#101826;color:#9bd0ff;border:2px solid #48c9b0;font-family:monospace;font-size:14px";
-  const btn = document.createElement("button");
-  btn.textContent = "▶ START";
-  btn.style.cssText = "padding:10px 18px;background:#48c9b0;color:#04121a;border:0;font-family:monospace;font-weight:bold;cursor:pointer";
-  const go = () => { if (input.value.trim()) { net.startRun(input.value.trim()); input.value = ""; } };
+  // Quest prompt bar (lives in the page layout; keep the same startRun behavior).
+  const input = document.getElementById("prompt-input") as HTMLInputElement;
+  const btn = document.getElementById("prompt-go") as HTMLButtonElement;
+  const go = () => {
+    const quest = input.value.trim();
+    if (quest) {
+      net.startRun(quest);
+      input.value = "";
+    }
+  };
   btn.onclick = go;
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
-  bar.append(input, btn);
-  document.body.appendChild(bar);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") go();
+  });
 }
 
 main();

@@ -4,13 +4,33 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AGENT QUEST</title>
-    <style>
-      html, body { margin: 0; background: #05030a; height: 100%; overflow: hidden; }
-      #app { width: 100vw; height: 100vh; }
-    </style>
+    <link rel="stylesheet" href="/src/client/styles.css" />
   </head>
   <body>
-    <div id="app"></div>
+    <main id="app">
+      <!-- The Game Boy. The Pixi canvas mounts inside #screen (the green LCD). -->
+      <div id="device">
+        <div id="screen"></div>
+      </div>
+
+      <!-- CRT-style MIND LOG terminal (populated by a later step). -->
+      <aside id="mindlog">
+        <div class="mindlog-header">MIND LOG</div>
+        <div class="mindlog-body"></div>
+      </aside>
+    </main>
+
+    <!-- Quest prompt, pinned to the bottom of the desk. -->
+    <div id="promptbar">
+      <input
+        id="prompt-input"
+        type="text"
+        placeholder="Give the hero a quest… (e.g. 'Read README.txt and tell me where the treasure is')"
+        autocomplete="off"
+      />
+      <button id="prompt-go" type="button">&#9654; START</button>
+    </div>
+
     <script type="module" src="/src/client/main.ts"></script>
   </body>
 </html>

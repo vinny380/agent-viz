@@ -1,0 +1,190 @@
+/* ───────────────────────────────────────────────────────────────────────────
+   AGENT QUEST — Game Boy console shell.
+   The whole app is framed as a physical DMG-01 sitting on a dark desk. The
+   PixiJS arena renders into the green LCD (#screen) at a fixed 320x288 buffer,
+   then CSS stretches it to fill the LCD rectangle with chunky pixels.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* LCD screen rectangle within public/gameboy.png, as fractions of the image.
+     Tune the whole screen placement here, in one place. */
+  --lcd-left: 37%;
+  --lcd-top: 21.5%;
+  --lcd-w: 35%;
+  --lcd-h: 23%;
+
+  --gb-aspect: 907 / 1100;
+
+  /* Desk / console palette. */
+  --desk-bg: #16181d;
+  --desk-bg-2: #0c0d10;
+  --lcd-green: #9bbc0f;
+  --crt-green: #8bff9b;
+  --crt-bg: #060a07;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--desk-bg-2);
+  /* Soft desk lighting: a warm pool of light behind the console. */
+  background-image: radial-gradient(
+    120% 90% at 50% 38%,
+    var(--desk-bg) 0%,
+    var(--desk-bg-2) 70%,
+    #050608 100%
+  );
+  color: #c7d0d8;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* ── Main stage: Game Boy on the left of center, MIND LOG to its right. ─────── */
+#app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3vw;
+  /* Leave room for the prompt bar pinned to the bottom. */
+  padding: 2vh 3vw 84px;
+}
+
+/* ── The Game Boy device. ──────────────────────────────────────────────────── */
+#device {
+  position: relative;
+  height: 92vh;
+  aspect-ratio: var(--gb-aspect);
+  background-image: url(/gameboy.png);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  /* Drop shadow so the console reads as a physical object on the desk. */
+  filter: drop-shadow(0 24px 40px rgba(0, 0, 0, 0.6));
+  flex: 0 0 auto;
+}
+
+/* ── The green LCD. The Pixi canvas mounts here. ───────────────────────────── */
+#screen {
+  position: absolute;
+  left: var(--lcd-left);
+  top: var(--lcd-top);
+  width: var(--lcd-w);
+  height: var(--lcd-h);
+  background: var(--lcd-green);
+  overflow: hidden;
+}
+
+#screen canvas {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  display: block;
+}
+
+/* ── MIND LOG: a CRT terminal panel to the right of the console. ───────────── */
+#mindlog {
+  flex: 0 1 360px;
+  align-self: center;
+  height: 78vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--crt-bg);
+  border: 2px solid #1d2a1f;
+  border-radius: 8px;
+  box-shadow:
+    inset 0 0 60px rgba(0, 0, 0, 0.9),
+    0 0 0 1px #000,
+    0 18px 40px rgba(0, 0, 0, 0.55);
+  color: var(--crt-green);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Subtle scanline overlay for the CRT look. */
+#mindlog::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.28) 3px,
+    rgba(0, 0, 0, 0.28) 4px
+  );
+  mix-blend-mode: multiply;
+}
+
+.mindlog-header {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  letter-spacing: 0.32em;
+  font-weight: 700;
+  color: #cfffd6;
+  border-bottom: 1px solid #16361b;
+  text-shadow: 0 0 8px rgba(139, 255, 155, 0.5);
+}
+
+.mindlog-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 12px;
+  text-shadow: 0 0 6px rgba(139, 255, 155, 0.35);
+}
+
+/* ── Quest prompt bar, pinned to the bottom of the desk. ───────────────────── */
+#promptbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(8, 10, 14, 0.82);
+  backdrop-filter: blur(4px);
+  border-top: 1px solid #20242c;
+}
+
+#prompt-input {
+  flex: 1;
+  padding: 10px 12px;
+  background: #101826;
+  color: #9bd0ff;
+  border: 2px solid #48c9b0;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+#prompt-input:focus {
+  border-color: #6fe3cf;
+  box-shadow: 0 0 0 2px rgba(72, 201, 176, 0.25);
+}
+
+#prompt-go {
+  padding: 10px 18px;
+  background: #48c9b0;
+  color: #04121a;
+  border: 0;
+  border-radius: 4px;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#prompt-go:hover {
+  background: #6fe3cf;
+}
