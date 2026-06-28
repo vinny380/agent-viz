@@ -41,9 +41,8 @@ export function setupInput(onPress: (b: Btn) => void): void {
     });
   });
 
-  // Clicking the LCD itself acts as A (confirm) — keeps the screen an inviting
-  // click target. The close (X) button stops propagation, so it won't fire A.
-  document.getElementById("screen")?.addEventListener("click", () => fire("a"));
+  // (The LCD click is owned by main.ts: it zooms the console rather than firing
+  // A, so clicking the screen enlarges the menu instead of selecting an item.)
 
   // Keyboard — but never steal keys while the player is typing a quest.
   window.addEventListener("keydown", (e) => {

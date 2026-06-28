@@ -26,6 +26,9 @@ interface Geom {
 export interface ZoomControl {
   enter(): void;
   exit(): void;
+  /** Show/hide the docked quest input. Only quest mode wants it; zooming the
+      menu just enlarges it. */
+  setPrompt(on: boolean): void;
   readonly zoomed: boolean;
 }
 
@@ -39,7 +42,7 @@ export function setupZoom(screenEl: HTMLElement, opts: { onExit?: () => void } =
   const promptBox = document.getElementById("screen-prompt");
   const input = document.getElementById("prompt-input") as HTMLInputElement | null;
   if (!device || !backdrop || !closeBtn || !promptBox) {
-    return { enter() {}, exit() {}, get zoomed() { return false; } };
+    return { enter() {}, exit() {}, setPrompt() {}, get zoomed() { return false; } };
   }
 
   let zoomed = false;
@@ -93,10 +96,18 @@ export function setupZoom(screenEl: HTMLElement, opts: { onExit?: () => void } =
     apply();
     device.classList.add("zoomed");
     backdrop.classList.add("visible");
-    promptBox.classList.add("visible");
     screenEl.setAttribute("aria-label", "Exit zoom");
-    // Focus the quest input so the player can type immediately.
-    if (input) input.focus();
+  };
+
+  // The docked quest input is independent of the zoom: only quest mode shows it.
+  const setPrompt = (on: boolean) => {
+    if (on) {
+      apply(); // keep it docked to the current LCD rect
+      promptBox.classList.add("visible");
+      input?.focus();
+    } else {
+      promptBox.classList.remove("visible");
+    }
   };
 
   // Restore focus to the LCD only on keyboard-driven exit, so a mouse exit
@@ -138,5 +149,5 @@ export function setupZoom(screenEl: HTMLElement, opts: { onExit?: () => void } =
     if (zoomed) apply();
   });
 
-  return { enter, exit: () => exit(false), get zoomed() { return zoomed; } };
+  return { enter, exit: () => exit(false), setPrompt, get zoomed() { return zoomed; } };
 }

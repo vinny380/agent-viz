@@ -12,13 +12,14 @@ export function connect(url: string, onEvent: (e: AgentEvent) => void) {
     const event = parseServerMessage(String(m.data));
     if (event) onEvent(event);
   });
+  const send = (msg: ClientMessage) => {
+    const fire = () => ws.send(JSON.stringify(msg));
+    if (ws.readyState === WebSocket.OPEN) fire();
+    else ws.addEventListener("open", fire, { once: true });
+  };
   return {
-    startRun(prompt: string) {
-      const msg: ClientMessage = { type: "start_run", prompt };
-      const fire = () => ws.send(JSON.stringify(msg));
-      if (ws.readyState === WebSocket.OPEN) fire();
-      else ws.addEventListener("open", fire, { once: true });
-    },
+    startRun(prompt: string) { send({ type: "start_run", prompt }); },
+    runExample(id: string) { send({ type: "run_example", id }); },
     close() { ws.close(); },
   };
 }
