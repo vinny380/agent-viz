@@ -66,6 +66,7 @@ interface TokenFx {
 export class Scene {
   private app: Application;
   private world: Container;
+  private crt: CRTFilter;
   private tethers: Graphics;
   private fx: Graphics; // portal rings + result-return tokens, above tethers/below sprites
   private views = new Map<string, CharView>();
@@ -96,11 +97,18 @@ export class Scene {
     app.stage.addChild(this.world);
 
     // Subtle CRT vibe; gentle so the green LCD stays readable at 320x288.
-    app.stage.filters = [new CRTFilter({ curvature: 3, lineWidth: 1, lineContrast: 0.2, vignetting: 0.2, noise: 0.04 })];
+    this.crt = new CRTFilter({ curvature: 3, lineWidth: 1, lineContrast: 0.2, vignetting: 0.2, noise: 0.04 });
+    app.stage.filters = [this.crt];
 
     this.drawBackdrop();
     app.ticker.add(() => { this.tick += 1; this.animate(); });
   }
+
+  /** Show/hide the agent arena (hidden while the boot menu is up). */
+  setArenaVisible(visible: boolean) { this.world.visible = visible; }
+
+  /** Toggle the CRT scanline filter (driven by the OPTIONS menu). */
+  setCrt(on: boolean) { this.app.stage.filters = on ? [this.crt] : []; }
 
   private drawBackdrop() {
     const bg = new Graphics();

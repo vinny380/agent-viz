@@ -10,14 +10,14 @@
   /* DMG-01 face proportions (portrait brick): the device box aspect. */
   --gb-aspect: 90 / 148;
 
-  /* Plastic body palette (warm light oatmeal/putty grey, top-lit). */
-  --gb-body-hi: #cfcabb;
-  --gb-body-lo: #c2bcab;
-  --gb-body-edge: #a9a392;
+  /* Plastic body palette (cool light silver-grey, top-lit). */
+  --gb-body-hi: #d3d4d5;
+  --gb-body-lo: #c4c5c6;
+  --gb-body-edge: #abacad;
 
-  /* Charcoal screen bezel. */
-  --gb-bezel-hi: #43474b;
-  --gb-bezel-lo: #2f3337;
+  /* Medium-grey screen bezel (the recessed plate the LCD sits in). */
+  --gb-bezel-hi: #8a8d90;
+  --gb-bezel-lo: #74777a;
 
   /* DMG accents. */
   --gb-navy: #28285f; /* wordmark / labels */
@@ -25,8 +25,6 @@
   --gb-dark: #26262b; /* d-pad */
   --gb-grey-btn: #58585f; /* start/select pills */
   --gb-led: #e8443a; /* power LED */
-  --gb-stripe-indigo: #2b2e72; /* muted DMG navy-blue */
-  --gb-stripe-magenta: #7e2c58; /* muted DMG magenta */
 
   /* LCD glass + CRT terminal palette. */
   --lcd-green: #9bbc0f;
@@ -106,7 +104,7 @@ body {
      vertical gradient so the shell reads as molded plastic catching light. */
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0) 3.5%, rgba(0, 0, 0, 0) 96.5%, rgba(0, 0, 0, 0.12) 100%),
-    linear-gradient(180deg, #e8e5db 0%, var(--gb-body-hi) 16%, var(--gb-body-lo) 74%, var(--gb-body-edge) 100%);
+    linear-gradient(180deg, #e3e4e5 0%, var(--gb-body-hi) 16%, var(--gb-body-lo) 74%, var(--gb-body-edge) 100%);
   /* Molded relief: bright top inner lip + dark inner base + soft side rims. */
   box-shadow:
     inset 0 0.5em 0.45em -0.25em rgba(255, 255, 255, 0.85),
@@ -177,39 +175,39 @@ body {
   right: 8%;
   height: 38%;
   background: linear-gradient(155deg, var(--gb-bezel-hi) 0%, var(--gb-bezel-lo) 100%);
-  border-radius: 0.7em;
-  /* 45-degree chamfer on the bottom-LEFT corner (iconic DMG detail); the big
-     body sweep is on the bottom-RIGHT, so these heavy features sit opposite. */
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 3.2em 100%, 0 calc(100% - 3.2em));
-  /* Recessed: dark inner shadow + a faint lower-right rim of reflected light. */
+  border-radius: 0.8em;
+  /* Recessed plate: soft inner shadow top-left + faint reflected light bottom-right,
+     and a bright lower lip on the body so it reads as a sunken panel. */
   box-shadow:
-    inset 0.12em 0.12em 0.5em rgba(0, 0, 0, 0.7),
-    inset -0.08em -0.08em 0.4em rgba(255, 255, 255, 0.06),
-    0 0.06em 0 rgba(255, 255, 255, 0.35);
+    inset 0.12em 0.12em 0.5em rgba(0, 0, 0, 0.45),
+    inset -0.08em -0.08em 0.4em rgba(255, 255, 255, 0.12),
+    0 0.06em 0 rgba(255, 255, 255, 0.4);
 }
 
 /* Power LED + BATTERY caption: a small horizontal row (red dot, then BATTERY)
    tucked at the upper-left of the bezel, beside the top of the screen. */
 .gb-battery {
   position: absolute;
-  left: 4%;
-  top: 14%;
+  left: 1.5%;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  gap: 0.3em;
+  gap: 0.4em;
 }
 
-/* LED sits FIRST in the row (DOM has the text first, so reorder it visually). */
+/* LED sits FIRST/above the label (DOM has the text first, so reorder it). */
 .gb-led {
   order: -1;
 }
 
 .gb-battery-text {
-  font-size: 0.55em;
-  letter-spacing: 0.12em;
-  color: #b8bdc2;
-  text-shadow: 0 0.05em 0.03em rgba(0, 0, 0, 0.4); /* engraved on the charcoal */
+  font-size: 0.5em;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: #8c2f2f; /* faded red silkscreen, like the reference */
+  text-shadow: 0 0.05em 0.03em rgba(0, 0, 0, 0.25);
 }
 
 .gb-led {
@@ -222,44 +220,35 @@ body {
     inset 0 0 0.1em rgba(0, 0, 0, 0.4);
 }
 
-/* Short ramp of diagonal accent stripes (the DMG "flag") near the chamfer. */
-.gb-stripes {
-  position: absolute;
-  left: 6%;
-  bottom: 7%;
-  width: 18%;
-  display: flex;
-  flex-direction: column;
-  gap: 0.18em;
-  transform: rotate(-25deg);
-  transform-origin: left bottom;
-}
-
-.gb-stripe {
-  height: 0.45em;
-  border-radius: 0.45em;
-}
-
-.gb-stripe--indigo {
-  background: var(--gb-stripe-indigo);
-}
-
-.gb-stripe--magenta {
-  background: var(--gb-stripe-magenta);
-}
-
-/* "DOT MATRIX WITH STEREO SOUND" below the LCD; inset left so it clears the
-   diagonal stripe badge that sits in the bottom-left of the bezel. */
+/* "DOT MATRIX WITH STEREO SOUND" caption ACROSS THE TOP of the bezel, above the
+   LCD, flanked by short engraved dashes (the iconic DMG detail). */
 .gb-dotmatrix {
   position: absolute;
-  left: 26%;
+  left: 14%;
   right: 6%;
-  bottom: 7%;
+  top: 4%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7em;
   text-align: center;
   font-size: 0.5em;
-  letter-spacing: 0.14em;
-  color: #cdcabf; /* warm silver ink */
-  text-shadow: 0 0.06em 0.04em rgba(0, 0, 0, 0.45); /* engraved on the charcoal */
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1.15;
+  color: #2c2f33; /* dark engraved ink on the grey bezel */
+  text-shadow: 0 0.06em 0.04em rgba(255, 255, 255, 0.18);
+}
+
+/* Short dark dash on each side of the caption. */
+.gb-dotmatrix::before,
+.gb-dotmatrix::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 1.6em;
+  height: 0.16em;
+  border-radius: 0.16em;
+  background: #2c2f33;
 }
 
 /* ── Wordmark on the grey body, below the bezel. The authentic "Nintendo GAME
@@ -267,19 +256,41 @@ body {
       with a faint silkscreen relief so it reads as printed into the plastic. ── */
 .gb-brand {
   position: absolute;
-  top: 49%;
+  top: 50%;
   left: 9%;
-  width: 46%;
+  width: 56%;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
   color: var(--gb-navy);
   filter:
     drop-shadow(0 0.04em 0 rgba(255, 255, 255, 0.5))
     drop-shadow(0 -0.02em 0.01em rgba(0, 0, 0, 0.18));
 }
 
+/* "Nintendo" set small ahead of the wordmark, like the reference. */
+.gb-brand-nintendo {
+  flex: 0 0 auto;
+  font-size: 1.1em;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* The authentic GAME BOY wordmark, skewed for its signature italic. */
 .gb-logo {
   display: block;
-  width: 100%;
+  flex: 0 1 auto;
+  width: 62%;
   height: auto;
+  transform: skewX(-9deg);
+}
+
+/* Trailing trademark mark. */
+.gb-brand-tm {
+  flex: 0 0 auto;
+  font-size: 0.6em;
+  font-weight: 700;
+  align-self: flex-start;
 }
 
 /* ── D-pad, lower-left. ────────────────────────────────────────────────────── */
@@ -343,6 +354,27 @@ body {
   background: radial-gradient(circle at 50% 38%, #2c2c31, #161619 80%);
   box-shadow: inset 0 0.08em 0.18em rgba(0, 0, 0, 0.65);
 }
+
+/* Four transparent click targets over the cross arms (one per direction). */
+.gb-dpad-zone {
+  position: absolute;
+  cursor: pointer;
+  z-index: 2;
+}
+.gb-dpad-zone--up { left: 33.3%; top: 0; width: 33.4%; height: 42%; }
+.gb-dpad-zone--down { left: 33.3%; bottom: 0; width: 33.4%; height: 42%; }
+.gb-dpad-zone--left { top: 33.3%; left: 0; width: 42%; height: 33.4%; }
+.gb-dpad-zone--right { top: 33.3%; right: 0; width: 42%; height: 33.4%; }
+
+/* ── Pressed-button feedback (added briefly by input.ts on press). ─────────── */
+.gb-btn,
+.gb-pill,
+.gb-dpad {
+  transition: transform 80ms ease, filter 80ms ease;
+}
+.gb-btn.gb-pressed { transform: translateY(0.12em); filter: brightness(0.9); }
+.gb-pill.gb-pressed { transform: translateY(0.08em); filter: brightness(0.88); }
+.gb-dpad.gb-pressed { transform: scale(0.96); filter: brightness(0.92); }
 
 /* ── A / B buttons, lower-right, on a -25deg diagonal. ─────────────────────── */
 .gb-ab {
@@ -445,21 +477,18 @@ body {
   position: absolute;
   right: 10%;
   bottom: 8%;
-  width: 7em;
+  width: 6.5em;
   height: 5em;
-  transform: rotate(-30deg);
-  transform-origin: bottom right;
-  /* Debossed dots: repeating radial-gradient grid, slanted by the rotation. */
-  background-image: radial-gradient(
-    circle,
-    rgba(0, 0, 0, 0.42) 0 0.13em,
-    transparent 0.16em
+  /* Debossed diagonal grille lines (six parallel slants, like the reference). */
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(0, 0, 0, 0.38) 0 0.14em,
+    transparent 0.14em 0.85em
   );
-  background-size: 0.62em 0.62em;
-  /* Taper the dot field so the rows fade as they approach the rounded corner. */
-  -webkit-mask-image: linear-gradient(135deg, #000 55%, transparent 100%);
-  mask-image: linear-gradient(135deg, #000 55%, transparent 100%);
-  filter: drop-shadow(0 0.04em 0 rgba(255, 255, 255, 0.35));
+  /* Taper the line field so it fades toward the rounded corner. */
+  -webkit-mask-image: linear-gradient(135deg, #000 50%, transparent 100%);
+  mask-image: linear-gradient(135deg, #000 50%, transparent 100%);
+  filter: drop-shadow(0 0.04em 0 rgba(255, 255, 255, 0.4));
 }
 
 /* ── The green LCD. The Pixi canvas mounts here. Click target for zoom. ────── */
@@ -469,7 +498,7 @@ body {
      -> centered on 50%). aspect-ratio locks the box to EXACTLY 10:9 to match the
      320:288 Pixi buffer, so the chunky pixels never stretch (height derives from
      width — do not also set an explicit height or the ratio is ignored). */
-  top: 9.5%;
+  top: 12%;
   left: 22%;
   width: 56%;
   aspect-ratio: 10 / 9;
@@ -478,11 +507,14 @@ body {
   cursor: zoom-in;
   /* The DMG glass has gently rounded corners (a touch more at the bottom). */
   border-radius: 5px 5px 9px 9px;
-  /* Recessed-glass depth: thin inner rim + soft inner shadow top & bottom. */
+  /* Recessed-glass depth + a thin dark frame separating the green from the grey
+     bezel (the black border around the LCD in the reference). */
   box-shadow:
     inset 0 0 0 1px rgba(15, 56, 15, 0.35),
     inset 0 2px 10px rgba(15, 56, 15, 0.5),
-    inset 0 -3px 9px rgba(15, 56, 15, 0.32);
+    inset 0 -3px 9px rgba(15, 56, 15, 0.32),
+    0 0 0 0.35em #2a2c2f,
+    0 0 0 0.42em rgba(255, 255, 255, 0.12);
   /* FLIP zoom: transform is set inline by zoom.ts; transition lives here. */
   transform-origin: center center;
   transition: transform 380ms cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -514,30 +546,32 @@ body {
     radial-gradient(135% 115% at 50% 0%, rgba(0, 0, 0, 0) 60%, rgba(15, 56, 15, 0.3) 100%);
 }
 
-/* Pulsing call-to-action on the LCD inviting the player to zoom in (normal
-   state). Sits low so it never blocks the agent tree; hidden once zoomed. */
-.screen-cta {
+/* Power-off overlay: SHUT DOWN fades the LCD to near-black with a reboot hint;
+   any button press powers it back on (main.ts toggles .on). */
+.screen-power {
   position: absolute;
-  left: 50%;
-  bottom: 7%;
-  transform: translateX(-50%);
-  z-index: 3;
-  padding: 2px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  white-space: nowrap;
-  color: #0f380f;
-  background: rgba(155, 188, 15, 0.4);
-  border: 1px solid rgba(15, 56, 15, 0.5);
-  border-radius: 10px;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
-  animation: cta-pulse 1.4s ease-in-out infinite;
+  background: #0a120a;
+  color: var(--lcd-green);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  opacity: 0;
+  transition: opacity 600ms ease;
 }
 
-@keyframes cta-pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+.screen-power.on {
+  opacity: 0.98;
+  animation: power-blink 1.2s steps(1, end) infinite;
+}
+
+@keyframes power-blink {
+  0%, 60% { color: var(--lcd-green); }
+  61%, 100% { color: rgba(155, 188, 15, 0.25); }
 }
 
 /* Close (X) button — only shown while zoomed (see .zoomed rules below). */
@@ -591,10 +625,6 @@ body {
 /* Reveal the close button + hide the call-to-action while zoomed. */
 #device.zoomed .screen-close {
   display: inline-flex;
-}
-
-#device.zoomed .screen-cta {
-  display: none;
 }
 
 /* The chrome recedes (slight scale-down + fade) so focus is on the LCD. */
@@ -752,7 +782,7 @@ body {
   .zoom-backdrop {
     transition: none !important;
   }
-  .screen-cta {
+  .screen-power.on {
     animation: none !important;
   }
 }

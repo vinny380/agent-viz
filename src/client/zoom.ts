@@ -23,14 +23,24 @@ interface Geom {
   promptBottom: number;
 }
 
-/** Wire up zoom on the LCD element. Call once, after the canvas is mounted. */
-export function setupZoom(screenEl: HTMLElement): void {
+export interface ZoomControl {
+  enter(): void;
+  exit(): void;
+  readonly zoomed: boolean;
+}
+
+/** Wire up zoom on the LCD element. Call once, after the canvas is mounted.
+    The controller drives enter()/exit(); `onExit` fires when the user backs out
+    via Esc / the X button / the backdrop so the controller can return to the menu. */
+export function setupZoom(screenEl: HTMLElement, opts: { onExit?: () => void } = {}): ZoomControl {
   const device = screenEl.closest("#device") as HTMLElement | null;
   const backdrop = document.getElementById("zoom-backdrop");
   const closeBtn = document.getElementById("screen-close");
   const promptBox = document.getElementById("screen-prompt");
   const input = document.getElementById("prompt-input") as HTMLInputElement | null;
-  if (!device || !backdrop || !closeBtn || !promptBox) return;
+  if (!device || !backdrop || !closeBtn || !promptBox) {
+    return { enter() {}, exit() {}, get zoomed() { return false; } };
+  }
 
   let zoomed = false;
 
@@ -102,43 +112,31 @@ export function setupZoom(screenEl: HTMLElement): void {
     if (viaKeyboard) screenEl.focus();
   };
 
-  // The WHOLE device is an easy click target: click anywhere on it to zoom in.
-  device.addEventListener("click", () => { if (!zoomed) enter(); });
+  // User-initiated back-out (Esc / X / backdrop): exit AND notify the controller
+  // so it can restore the boot menu.
+  const userExit = (viaKeyboard = false) => {
+    if (!zoomed) return;
+    exit(viaKeyboard);
+    opts.onExit?.();
+  };
 
-  // Keyboard on the focused LCD: Enter/Space zooms in.
-  screenEl.addEventListener("keydown", (e) => {
-    if ((e.key === "Enter" || e.key === " ") && !zoomed) {
-      e.preventDefault();
-      enter();
-    }
-  });
-
-  // Global keys: Esc exits; Enter from anywhere (when not already typing) zooms in.
+  // Esc exits when zoomed.
   window.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && zoomed) {
-      exit(true);
-      return;
-    }
-    if (e.key === "Enter" && !zoomed) {
-      const t = e.target as HTMLElement | null;
-      const typing = !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA");
-      if (!typing) {
-        e.preventDefault();
-        enter();
-      }
-    }
+    if (e.key === "Escape" && zoomed) userExit(true);
   });
 
-  // X button and backdrop both exit. Stop the X click from bubbling to #device
-  // (which would immediately re-enter).
+  // X button and backdrop both exit. Stop the X click from bubbling (so it
+  // doesn't read as an LCD/A press).
   closeBtn.addEventListener("click", (e) => {
     e.stopPropagation();
-    exit();
+    userExit();
   });
-  backdrop.addEventListener("click", () => exit());
+  backdrop.addEventListener("click", () => userExit());
 
   // Keep the LCD framed + the prompt docked across resizes while zoomed.
   window.addEventListener("resize", () => {
     if (zoomed) apply();
   });
+
+  return { enter, exit: () => exit(false), get zoomed() { return zoomed; } };
 }
