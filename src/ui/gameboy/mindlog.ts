@@ -1,20 +1,22 @@
 import type { WorldState, LogEntry } from "./store";
 
 /**
- * MIND LOG — a persistent, color-coded, threaded transcript panel.
+ * MIND LOG — a threaded, graph-style transcript of the agent run.
  *
- * This panel lives OUTSIDE the Game Boy's monochrome LCD, so colour is allowed
- * here: each agent gets its own hue (assigned by order of first appearance) and
- * subagents are indented under their parent so HERO → SCOUT reads like a
- * threaded conversation.
+ * Each entry renders as a row in an interaction tree (think Sentry spans):
+ *   • a left RAIL of connector lines, indented + coloured by the agent's hue,
+ *     so HERO → SCOUT reads as a threaded conversation;
+ *   • a colour-coded ICON BADGE keyed to the entry KIND, so thinking, tool
+ *     calls, tool results and final answers are distinguishable at a glance;
+ *   • a title (agent label · kind) and the inline message/preview text.
  *
- * It is stream-friendly: a rendered-count cursor means we only ever append DOM
- * nodes for genuinely new entries, and if the trailing entry's text grew
- * (coalesced streaming thinking/say), we patch that one node's text in place.
+ * It is stream-friendly: a rendered-count cursor means we only append DOM for
+ * genuinely new entries, and if the trailing entry's text grew (coalesced
+ * streaming thinking/say) we patch just that row's text node in place.
  */
 
-// A small fixed palette of CRT-friendly hues. Agents are assigned a colour from
-// this list in order of first appearance and the assignment is remembered.
+// A small fixed palette of CRT-friendly hues for the per-agent thread rails.
+// Agents are assigned a colour in order of first appearance.
 const PALETTE = [
   "#8bff9b", // green   — typically the root HERO
   "#7fd0ff", // cyan
@@ -29,19 +31,16 @@ const PALETTE = [
 // Warning colour for failed results (ok === false) and errors.
 const WARN_COLOR = "#ff6b6b";
 
-// Per-kind glyph prefixed to each entry.
-const KIND_GLYPH: Record<LogEntry["kind"], string> = {
-  think: "\u{1F9E0}", // 🧠
-  say: "\u{1F4AC}", // 💬
-  model: "◇", // ◇
-  tool: "⚙", // ⚙
-  result: "←", // ←
-  final: "✓", // ✓
-  error: "✖", // ✖
+// Per-kind presentation: badge glyph, accent colour, and a human title tag.
+const KIND: Record<LogEntry["kind"], { glyph: string; color: string; tag: string }> = {
+  think: { glyph: "\u{1F9E0}", color: "#b69bff", tag: "thinking" },
+  say: { glyph: "\u{1F4AC}", color: "#7fd0ff", tag: "message" },
+  model: { glyph: "◇", color: "#9b8bff", tag: "llm" },
+  tool: { glyph: "⚙", color: "#ffb38b", tag: "tool" },
+  result: { glyph: "←", color: "#9bffd6", tag: "result" },
+  final: { glyph: "✓", color: "#8bff9b", tag: "final" },
+  error: { glyph: "✖", color: WARN_COLOR, tag: "error" },
 };
-
-// Visual indent per depth level, in pixels.
-const INDENT_PX = 18;
 
 export interface MindLog {
   render(world: WorldState): void;
@@ -57,10 +56,10 @@ export function createMindLog(container: HTMLElement): MindLog {
 
   // agentId → assigned colour. Order of insertion drives palette assignment.
   const colors = new Map<string, string>();
-  // The DOM node for each rendered entry, indexed by log position, so we can
-  // patch the trailing node's text in place when streaming text grows.
-  const nodes: HTMLDivElement[] = [];
-  // How many log entries we have already turned into DOM nodes.
+  // The .ml-text node for each rendered row, indexed by log position, so we can
+  // patch the trailing one in place when streaming text grows.
+  const textNodes: HTMLElement[] = [];
+  // How many log entries we have already turned into DOM rows.
   let renderedCount = 0;
 
   function colorFor(agentId: string): string {
@@ -72,28 +71,54 @@ export function createMindLog(container: HTMLElement): MindLog {
     return c;
   }
 
-  /** Composes the visible text for an entry: "LABEL glyph text". */
-  function lineText(entry: LogEntry): string {
-    const glyph = KIND_GLYPH[entry.kind];
-    return `${entry.label} ${glyph} ${entry.text}`;
-  }
-
-  /** Applies colour, indent and warning state to a row for the given entry. */
-  function style(node: HTMLDivElement, entry: LogEntry): void {
+  /** Accent colour for an entry's icon — kind colour, or warn for failures. */
+  function accentFor(entry: LogEntry): string {
     const warn = entry.kind === "error" || (entry.kind === "result" && entry.ok === false);
-    node.style.color = warn ? WARN_COLOR : colorFor(entry.agentId);
-    node.style.marginLeft = `${entry.depth * INDENT_PX}px`;
+    return warn ? WARN_COLOR : KIND[entry.kind].color;
   }
 
-  function makeNode(entry: LogEntry): HTMLDivElement {
+  function makeRow(entry: LogEntry): { row: HTMLDivElement; text: HTMLElement } {
+    const hue = colorFor(entry.agentId);
+    const accent = accentFor(entry);
+
+    const row = document.createElement("div");
+    row.className = "ml-row";
+    row.dataset.kind = entry.kind;
+
+    // Left rail: one connector cell per ancestor depth, coloured by agent hue.
+    // The last cell (--branch) tees an elbow into the node.
+    for (let d = 0; d < entry.depth; d++) {
+      const guide = document.createElement("span");
+      guide.className = d === entry.depth - 1 ? "ml-guide ml-guide--branch" : "ml-guide";
+      guide.style.setProperty("--thread", hue);
+      row.appendChild(guide);
+    }
+
     const node = document.createElement("div");
-    node.className = "mindlog-line";
-    // Preserve newlines from multi-line tool output / final answers.
-    node.style.whiteSpace = "pre-wrap";
-    node.style.wordBreak = "break-word";
-    style(node, entry);
-    node.textContent = lineText(entry);
-    return node;
+    node.className = "ml-node";
+
+    const icon = document.createElement("span");
+    icon.className = "ml-icon";
+    icon.style.setProperty("--accent", accent);
+    icon.textContent = KIND[entry.kind].glyph;
+
+    const main = document.createElement("div");
+    main.className = "ml-main";
+
+    const title = document.createElement("div");
+    title.className = "ml-title";
+    title.style.color = hue;
+    title.textContent = `${entry.label} · ${KIND[entry.kind].tag}`;
+
+    const text = document.createElement("div");
+    text.className = "ml-text";
+    text.textContent = entry.text;
+
+    main.append(title, text);
+    node.append(icon, main);
+    row.appendChild(node);
+
+    return { row, text };
   }
 
   function render(world: WorldState): void {
@@ -102,33 +127,28 @@ export function createMindLog(container: HTMLElement): MindLog {
     // If the world was reset (fewer entries than we have rendered), start over.
     if (log.length < renderedCount) {
       body.replaceChildren();
-      nodes.length = 0;
+      textNodes.length = 0;
       renderedCount = 0;
     }
 
-    // The trailing entry may have grown (coalesced streaming text) since we last
-    // rendered it; patch its node's text in place rather than re-appending.
+    // The trailing entry may have grown (coalesced streaming text); patch just
+    // its text node rather than re-appending the row.
     if (renderedCount > 0 && renderedCount <= log.length) {
       const lastIndex = renderedCount - 1;
       const entry = log[lastIndex];
-      const node = nodes[lastIndex];
-      if (entry !== undefined && node !== undefined) {
-        const text = lineText(entry);
-        if (node.textContent !== text) {
-          node.textContent = text;
-          style(node, entry);
-        }
+      const text = textNodes[lastIndex];
+      if (entry !== undefined && text !== undefined && text.textContent !== entry.text) {
+        text.textContent = entry.text;
       }
     }
 
-    // Append DOM nodes for any genuinely new entries.
+    // Append rows for any genuinely new entries.
     if (log.length > renderedCount) {
       const frag = document.createDocumentFragment();
       for (let i = renderedCount; i < log.length; i++) {
-        const entry = log[i]!;
-        const node = makeNode(entry);
-        nodes[i] = node;
-        frag.appendChild(node);
+        const { row, text } = makeRow(log[i]!);
+        textNodes[i] = text;
+        frag.appendChild(row);
       }
       body.appendChild(frag);
       renderedCount = log.length;
