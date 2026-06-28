@@ -31,6 +31,8 @@ const FONT = { fontFamily: "monospace", fill: DMG_DARK } as const;
 const SPRITE_SCALE = 1.5;
 const RING_CY = -24;
 const RING_R = 24;
+// Base horizontal gap between sibling subagents (clamped to fit the 320px LCD).
+const CHILD_SPREAD = 106;
 
 interface CharView {
   root: Container;
@@ -74,6 +76,9 @@ export class Scene {
   // Latest layout positions, cached so the ticker can animate tethers/tokens
   // between renders without recomputing layout.
   private positions = new Map<string, { x: number; y: number }>();
+  // Per-agent max name width (px), so each label is clipped to fit its column
+  // and never collides with a sibling's. Computed by layout(), used by render().
+  private nameMaxW = new Map<string, number>();
   // Subagents (depth>0) whose spawn portal has already played, so it fires once.
   private portalPlayed = new Set<string>();
   // Subagents whose result-return token has already played, so it fires once.
@@ -110,15 +115,23 @@ export class Scene {
   /** Lay agents out for a 320x288 LCD: root near the top, children fanned beneath. */
   private layout(world: WorldState): Map<string, { x: number; y: number }> {
     const pos = new Map<string, { x: number; y: number }>();
+    this.nameMaxW = new Map<string, number>();
     const w = this.app.renderer.width, h = this.app.renderer.height;
     const roots = Object.values(world.agents).filter((a) => a.parentId === null);
     roots.forEach((r, i) => {
       pos.set(r.agentId, { x: w / 2, y: h * 0.34 + i * 16 });
+      this.nameMaxW.set(r.agentId, 200); // root is centered & alone: plenty of room
       const kids = Object.values(world.agents).filter((a) => a.parentId === r.agentId);
+      const n = kids.length;
+      // Fan children across the width. Clamp the gap so the OUTERMOST sprite+label
+      // stays on-screen even with 4+ children (otherwise names run off the LCD).
+      const maxHalf = w / 2 - 50;
+      const step = n > 1 ? Math.min(CHILD_SPREAD, (maxHalf * 2) / (n - 1)) : 0;
       kids.forEach((k, j) => {
-        // Fan up to ~3 children across the width without overflowing 320px.
-        const spread = (j - (kids.length - 1) / 2) * 92;
+        const spread = (j - (n - 1) / 2) * step;
         pos.set(k.agentId, { x: w / 2 + spread, y: h * 0.82 });
+        // A name must fit its column so it never collides with a neighbor's.
+        this.nameMaxW.set(k.agentId, n > 1 ? Math.max(46, step - 12) : 160);
       });
     });
     // any deeper descendants: stack just below their parent if known
@@ -126,6 +139,7 @@ export class Scene {
       if (!pos.has(a.agentId) && a.parentId && pos.has(a.parentId)) {
         const p = pos.get(a.parentId)!;
         pos.set(a.agentId, { x: p.x, y: Math.min(h - 24, p.y + 70) });
+        this.nameMaxW.set(a.agentId, 120);
       }
     }
     return pos;
@@ -135,25 +149,28 @@ export class Scene {
     let v = this.views.get(agent.agentId);
     if (v) return v;
 
-    if (!this.textures.has(agent.agentId)) this.textures.set(agent.agentId, makeSpriteTexture(this.app, agent.agentId));
+    // The root HERO uses a stable sprite seed so it always looks like the SAME
+    // hero across quests (each run gets a fresh agentId, but the hero is constant).
+    const spriteKey = agent.depth === 0 ? "HERO" : agent.agentId;
+    if (!this.textures.has(spriteKey)) this.textures.set(spriteKey, makeSpriteTexture(this.app, spriteKey));
     const root = new Container();
 
-    const sprite = new Sprite(this.textures.get(agent.agentId)!);
+    const sprite = new Sprite(this.textures.get(spriteKey)!);
     sprite.anchor.set(0.5, 1);
     sprite.scale.set(SPRITE_SCALE);
 
     const ring = new Graphics();
     const gauge = new Graphics();
 
-    const nameText = new Text({ text: agent.label, style: { ...FONT, fontSize: 13, fontWeight: "bold" } });
+    const nameText = new Text({ text: agent.label, style: { ...FONT, fontSize: 11, fontWeight: "bold" } });
     nameText.anchor.set(0.5, 1);
     nameText.y = -56;
 
-    const phaseText = new Text({ text: "", style: { ...FONT, fontSize: 12, fontWeight: "bold" } });
+    const phaseText = new Text({ text: "", style: { ...FONT, fontSize: 11, fontWeight: "bold" } });
     phaseText.anchor.set(0.5, 0);
     phaseText.y = 6;
 
-    const stepText = new Text({ text: "", style: { ...FONT, fontSize: 10, fill: DMG_MID } });
+    const stepText = new Text({ text: "", style: { ...FONT, fontSize: 9, fill: DMG_MID } });
     stepText.anchor.set(0.5, 0);
     stepText.y = 22;
 
@@ -205,6 +222,9 @@ export class Scene {
       const p = pos.get(agent.agentId) ?? { x: 32, y: 32 };
       v.root.x = p.x; v.root.y = p.y;
 
+      // Clip the name to its column width so siblings never overlap (see layout()).
+      fitText(v.nameText, agent.label, this.nameMaxW.get(agent.agentId) ?? 120);
+
       const color = PHASE_COLOR[agent.phase];
       // Monochrome LCD: dim idle sprites toward the mid green, keep others crisp.
       v.sprite.tint = agent.phase === "idle" ? DMG_MID : 0xffffff;
@@ -217,19 +237,47 @@ export class Scene {
       v.phaseText.style.fill = color;
       v.stepText.text = agent.step > 0 ? `STEP ${agent.step}` : "";
 
-      // Bubble shows only the active tool name (narrow), nothing else.
+      // Bubble: the agent's FINAL answer once it finishes; otherwise the active
+      // tool name while it works. Final text wraps and is clipped to fit the tiny
+      // LCD — the complete answer always lives in the MIND LOG.
       let bubbleStr = "";
-      if (agent.phase === "acting" && agent.currentTool) bubbleStr = clip(agent.currentTool.name, 12);
-      else if (agent.phase === "observing" && agent.currentTool) bubbleStr = clip(agent.currentTool.name, 12);
+      let isResult = false;
+      if (agent.phase === "finished" && agent.finalText && agent.finalText.trim()) {
+        // Keep results to ~2 lines so up to four bubbles coexist on the 320px LCD.
+        const maxChars = agent.depth === 0 ? 56 : 33;
+        bubbleStr = clip(agent.finalText.replace(/\s+/g, " ").trim(), maxChars);
+        isResult = true;
+      } else if ((agent.phase === "acting" || agent.phase === "observing") && agent.currentTool) {
+        bubbleStr = clip(agent.currentTool.name, 12);
+      }
 
       v.bubble.visible = bubbleStr.length > 0;
       if (v.bubble.visible) {
+        const maxW = isResult ? (agent.depth === 0 ? 200 : 100) : 150;
         v.bubbleText.text = bubbleStr;
+        v.bubbleText.style.wordWrap = isResult;
+        v.bubbleText.style.wordWrapWidth = maxW - 12;
+        v.bubbleText.style.fontSize = isResult ? 10 : 11;
+
         const bg = (v.bubble as { __bg?: Graphics }).__bg!;
-        const bw = Math.min(150, Math.max(36, v.bubbleText.width + 12));
-        const bh = v.bubbleText.height + 6;
+        const bw = Math.min(maxW, Math.max(36, v.bubbleText.width + 12));
+        const bh = v.bubbleText.height + 7;
         bg.clear();
-        bg.roundRect(0, 0, bw, bh, 3).fill({ color: DMG_LIGHTEST, alpha: 0.95 }).stroke({ color: DMG_DARK, width: 1 });
+        bg.roundRect(0, 0, bw, bh, 3).fill({ color: DMG_LIGHTEST, alpha: 0.96 }).stroke({ color: DMG_DARK, width: 1 });
+
+        if (isResult) {
+          // Center the result bubble on the agent, sitting ABOVE its name label,
+          // clamped inside the LCD. The hero (top) lands near the top edge and the
+          // subagents (bottom) land in the middle band, so they never collide.
+          const W = this.app.renderer.width, H = this.app.renderer.height;
+          const bx = Math.max(2, Math.min(W - bw - 2, p.x - bw / 2));
+          const by = Math.max(2, Math.min(H - bh - 2, p.y - 72 - bh));
+          v.bubble.x = bx - p.x;
+          v.bubble.y = by - p.y;
+        } else {
+          v.bubble.x = 16;
+          v.bubble.y = -74;
+        }
       }
     }
 
@@ -379,4 +427,16 @@ export class Scene {
 /** Clip a string to a narrow cap so it fits the 320px LCD. */
 function clip(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + "…" : s;
+}
+
+/** Trim a Text's content with an ellipsis until it renders within maxWidth (px). */
+function fitText(t: Text, full: string, maxWidth: number): void {
+  if (t.text !== full) t.text = full; // reset (maxWidth may have grown)
+  if (t.width <= maxWidth) return;
+  let s = full;
+  while (s.length > 1) {
+    s = s.slice(0, -1);
+    t.text = s + "…";
+    if (t.width <= maxWidth) return;
+  }
 }
