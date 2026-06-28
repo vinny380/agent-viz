@@ -2,16 +2,21 @@ import { Application } from "pixi.js";
 import { Scene } from "./scene";
 import { connect } from "./net";
 import { createMindLog } from "./mindlog";
+import { setupZoom } from "./zoom";
 import { initialWorld, reduce, type WorldState } from "./store";
 
-const WS_URL = "ws://localhost:8787";
+const WS_URL = "ws://localhost:8788";
 
 async function main() {
   // Fixed internal resolution: the 320x288 buffer is stretched to fill the
   // Game Boy's LCD by CSS (image-rendering: pixelated) for chunky pixels.
   const app = new Application();
   await app.init({ width: 320, height: 288, background: "#9bbc0f", antialias: false });
-  document.getElementById("screen")!.appendChild(app.canvas);
+  const screen = document.getElementById("screen")!;
+  screen.appendChild(app.canvas);
+
+  // Click-to-focus zoom on the LCD (chrome recedes, LCD lifts above a backdrop).
+  setupZoom(screen);
 
   const scene = new Scene(app);
 

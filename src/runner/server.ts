@@ -9,7 +9,7 @@ import { createAnthropicModelClient } from "./model";
 import { createToolRegistry } from "./tools";
 import { runAgent } from "./anthropic-agent";
 
-const PORT = 8787;
+const PORT = 8788;
 const HOST = "127.0.0.1";
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
