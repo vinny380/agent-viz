@@ -10,7 +10,7 @@ const prompt =
   process.argv[2] ||
   "Read README.txt and notes.txt in your sandbox. Work out the total gold for 7 chests using the calculator. Then spawn a scout subagent to re-read notes.txt and confirm the per-chest amount. Give a short final answer.";
 
-const server = spawn("npx", ["tsx", "src/runner/server.ts"], {
+const server = spawn("npx", ["tsx", "src/engine/server.ts"], {
   stdio: ["ignore", "pipe", "pipe"],
 });
 let started = false;
@@ -23,7 +23,7 @@ server.stderr.on("data", (d) => process.stderr.write("[server-err] " + d));
 function begin() {
   if (started) return;
   started = true;
-  const ws = new WebSocket("ws://127.0.0.1:8787");
+  const ws = new WebSocket("ws://127.0.0.1:8788");
   const counts = {};
   const agents = new Map();
   let thinkingChars = 0;

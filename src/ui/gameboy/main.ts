@@ -7,8 +7,10 @@ import { setupInput, type Btn } from "./input";
 import { Menu } from "./menu";
 import { blip, blipBack, blipSelect } from "./sound";
 import { initialWorld, reduce, type WorldState } from "./store";
+import { createFeedback } from "./feedback";
 
-const WS_URL = "ws://localhost:8788";
+const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+const WS_URL = env?.VITE_TRACE_WS_URL ?? "ws://127.0.0.1:8788";
 const QUEST_KEY = "aq.quests"; // recent quests, for HIGH SCORES
 
 const MENU_ITEMS = [
@@ -27,6 +29,9 @@ async function main() {
   const screen = document.getElementById("screen")!;
   screen.appendChild(app.canvas);
 
+  // Audio + haptic feedback driven by the live agent event stream.
+  const feedback = createFeedback();
+
   const scene = new Scene(app);
   scene.setArenaVisible(false); // boot to the menu, not an empty arena
 
@@ -38,6 +43,7 @@ async function main() {
   mindlog.render(world);
 
   const net = connect(WS_URL, (event) => {
+    feedback.event(event);
     world = reduce(world, event);
     scene.setWorld(world);
     mindlog.render(world);

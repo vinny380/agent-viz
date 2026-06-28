@@ -33,6 +33,7 @@ const WARN_COLOR = "#ff6b6b";
 const KIND_GLYPH: Record<LogEntry["kind"], string> = {
   think: "\u{1F9E0}", // 🧠
   say: "\u{1F4AC}", // 💬
+  model: "◇", // ◇
   tool: "⚙", // ⚙
   result: "←", // ←
   final: "✓", // ✓

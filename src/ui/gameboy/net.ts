@@ -1,4 +1,4 @@
-import { isAgentEvent, type AgentEvent, type ClientMessage } from "../shared/events";
+import { isAgentEvent, type AgentEvent, type ClientMessage } from "../../shared/events";
 
 export function parseServerMessage(raw: string): AgentEvent | null {
   let value: unknown;

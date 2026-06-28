@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+export const ANTHROPIC_MODEL = "claude-opus-4-8";
+
 export interface ModelMessage { role: "user" | "assistant"; content: unknown; }
 export interface ModelToolDef { name: string; description: string; input_schema: Record<string, unknown>; }
 export interface ModelTurnInput { system: string; messages: ModelMessage[]; tools: ModelToolDef[]; }
@@ -24,7 +26,7 @@ export function createAnthropicModelClient(apiKey: string): ModelClient {
       // newer params (thinking.display, output_config) may outpace the SDK's
       // published types; build the object and cast once.
       const params = {
-        model: "claude-opus-4-8",
+        model: ANTHROPIC_MODEL,
         max_tokens: 16000,
         thinking: { type: "adaptive", display: "summarized" },
         output_config: { effort: "high" },
