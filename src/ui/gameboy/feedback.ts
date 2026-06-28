@@ -13,7 +13,6 @@ type Cue =
 
 export interface Feedback {
   event(event: AgentEvent): void;
-  ui(cue: "select" | "start" | "back"): void;
 }
 
 const HAPTIC: Record<Cue, number | number[]> = {
@@ -67,10 +66,6 @@ export function createFeedback(): Feedback {
     event(event) {
       const cue = cueForEvent(event);
       if (cue) play(cue);
-    },
-    ui(cue) {
-      if (cue === "start") play("boot");
-      else play("select");
     },
   };
 }
