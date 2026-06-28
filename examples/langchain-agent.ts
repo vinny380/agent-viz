@@ -1,4 +1,5 @@
 import "dotenv/config";
+import Anthropic from "@anthropic-ai/sdk";
 import { RunnableLambda, RunnableSequence } from "@langchain/core/runnables";
 import { DynamicTool } from "@langchain/core/tools";
 import { connectAgentViz } from "../src/listener/websocket";
@@ -7,8 +8,33 @@ import type { AgentTrace } from "../src/listener/index";
 
 const TRACE_URL = defaultTraceUrl();
 const SPEED = Number(process.env.WORKFLOW_SPEED_MS ?? "1");
+const MODEL = process.env.ANTHROPIC_EXAMPLE_MODEL ?? "claude-opus-4-8";
+
+// Real Claude calls when a key is present; the smoke harness forces them off
+// (ANTHROPIC_EXAMPLE_REAL=0) and we auto-mock when no key is set, so the
+// keyless/offline paths still work.
+// ponytail: reuses @anthropic-ai/sdk (already a dep) — no @langchain/anthropic.
+const USE_REAL = process.env.ANTHROPIC_EXAMPLE_REAL !== "0" && Boolean(process.env.ANTHROPIC_API_KEY);
+const client = USE_REAL ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }) : null;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, Math.max(0, ms * SPEED)));
+
+/** One Claude turn, or a deterministic mock string when running offline. */
+async function callClaude(prompt: string, mock: string): Promise<string> {
+  if (!client) {
+    await wait(420);
+    return mock;
+  }
+  const message = await client.messages.create({
+    model: MODEL,
+    max_tokens: 512, // ponytail: short demo replies; bump if outputs truncate
+    messages: [{ role: "user", content: prompt }],
+  });
+  return message.content
+    .filter((block): block is Anthropic.TextBlock => block.type === "text")
+    .map((block) => block.text)
+    .join("");
+}
 
 async function runLangChainWorker(
   parent: AgentTrace,
@@ -22,10 +48,13 @@ async function runLangChainWorker(
     agent.think(`Build LangChain chain for ${label}.`);
 
     const planStep = RunnableLambda.from(async (task: string) => {
-      return agent.llm("langchain:mock-chat-model", async () => {
-        await wait(420);
-        return `${label} plan: ${task}`;
-      });
+      return agent.llm(
+        { provider: "anthropic", model: USE_REAL ? MODEL : "langchain-mock-chat", input: { task } },
+        () => callClaude(
+          `You are ${label}, a release-readiness worker. In two sentences, outline a plan to: ${task}`,
+          `${label} plan: ${task}`,
+        ),
+      );
     });
 
     const toolStep = RunnableLambda.from(async (plan: string) => {
@@ -35,10 +64,13 @@ async function runLangChainWorker(
 
     const summaryStep = RunnableLambda.from(async (toolReport: string) => {
       agent.step();
-      return agent.llm("langchain:mock-summary-model", async () => {
-        await wait(360);
-        return `${label} summary: ${toolReport}`;
-      });
+      return agent.llm(
+        { provider: "anthropic", model: USE_REAL ? MODEL : "langchain-mock-summary", input: { toolReport } },
+        () => callClaude(
+          `Summarize this ${label} tool report in one sentence:\n${toolReport}`,
+          `${label} summary: ${toolReport}`,
+        ),
+      );
     });
 
     const chain = RunnableSequence.from([planStep, toolStep, summaryStep]);
@@ -128,10 +160,13 @@ export async function runLangChainExample(): Promise<void> {
           });
         }),
         RunnableLambda.from(async (merged: string) => {
-          return agent.llm("langchain:mock-synthesis-model", async () => {
-            await wait(520);
-            return `LangChain release packet ready:\n${merged}`;
-          });
+          return agent.llm(
+            { provider: "anthropic", model: USE_REAL ? MODEL : "langchain-mock-synthesis", input: { merged } },
+            () => callClaude(
+              `You are a release manager. Combine these worker reports into a short release-readiness packet:\n${merged}`,
+              `LangChain release packet ready:\n${merged}`,
+            ),
+          );
         }),
       ]);
 
