@@ -11,17 +11,19 @@ answers, and errors.
 ## Run the Hub
 
 ```sh
-npm run dev
+npm start          # or `npx agent-viz` once installed
 ```
 
-The WebSocket trace hub listens on:
+One command: boots the hub, serves the viewer, and opens the browser. The
+WebSocket trace hub listens on:
 
 ```txt
 ws://127.0.0.1:8788
 ```
 
-Use `AGENT_VIZ_PORT` and `VITE_TRACE_WS_URL` when another workspace is already
-using the default port.
+So `connectAgentViz()` (no args) finds it with zero config. Set `AGENT_VIZ_PORT`
+to move the hub (it also updates the viewer's `VITE_TRACE_WS_URL`). `npm run dev`
+is the same thing, file-watched for hacking on the viewer.
 
 `ANTHROPIC_API_KEY` is only needed for the bundled demo prompt runner. Without
 it, the server still works as a passive listener for external traces.

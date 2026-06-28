@@ -175,7 +175,8 @@ Use a different port when another workspace already holds `8788`.
 ## Develop
 
 ```sh
-npm run dev          # client + hub, watched
+npm start            # one command: hub + viewer + opens browser
+npm run dev          # same, file-watched for hacking on the viewer
 npm test             # vitest (store reducer, agent loop, protocol guards, SDK)
 npm run build        # tsc --noEmit && vite build
 npm run smoke:listener-examples   # deterministic end-to-end over the wire
