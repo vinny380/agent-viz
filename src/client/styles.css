@@ -1,26 +1,41 @@
 /* ───────────────────────────────────────────────────────────────────────────
    AGENT QUEST — Game Boy console shell.
-   The whole app is framed as a physical DMG-01 sitting on a dark desk. The
-   PixiJS arena renders into the green LCD (#screen) at a fixed 320x288 buffer,
-   then CSS stretches it to fill the LCD rectangle with chunky pixels.
+   The whole app is framed as a physical DMG-01 (1989 grey "brick") drawn
+   ENTIRELY in CSS — no images. The PixiJS arena renders into the green LCD
+   (#screen) at a fixed 320x288 buffer, then CSS stretches it to fill the LCD
+   rectangle with chunky pixels. Clicking the LCD zooms it to a focused view.
    ─────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  /* LCD screen rectangle within public/gameboy.png, as fractions of the image.
-     Tune the whole screen placement here, in one place. */
-  --lcd-left: 39.3%;
-  --lcd-top: 20.4%;
-  --lcd-w: 31.6%;
-  --lcd-h: 25%;
+  /* DMG-01 face proportions (portrait brick): the device box aspect. */
+  --gb-aspect: 90 / 148;
 
-  --gb-aspect: 907 / 1100;
+  /* Plastic body palette (warm light oatmeal/putty grey, top-lit). */
+  --gb-body-hi: #cfcabb;
+  --gb-body-lo: #c2bcab;
+  --gb-body-edge: #a9a392;
 
-  /* Desk / console palette. */
-  --desk-bg: #16181d;
-  --desk-bg-2: #0c0d10;
+  /* Charcoal screen bezel. */
+  --gb-bezel-hi: #43474b;
+  --gb-bezel-lo: #2f3337;
+
+  /* DMG accents. */
+  --gb-navy: #28285f; /* wordmark / labels */
+  --gb-magenta: #9a2d57; /* A/B buttons */
+  --gb-dark: #26262b; /* d-pad */
+  --gb-grey-btn: #58585f; /* start/select pills */
+  --gb-led: #e8443a; /* power LED */
+  --gb-stripe-indigo: #2b2e72; /* muted DMG navy-blue */
+  --gb-stripe-magenta: #7e2c58; /* muted DMG magenta */
+
+  /* LCD glass + CRT terminal palette. */
   --lcd-green: #9bbc0f;
   --crt-green: #8bff9b;
   --crt-bg: #060a07;
+
+  /* Desk / console background. */
+  --desk-bg: #16181d;
+  --desk-bg-2: #0c0d10;
 }
 
 * {
@@ -52,33 +67,415 @@ body {
   align-items: center;
   justify-content: center;
   gap: 3vw;
-  /* Leave room for the prompt bar pinned to the bottom. */
-  padding: 2vh 3vw 84px;
+  padding: 2vh 3vw;
 }
 
-/* ── The Game Boy device. ──────────────────────────────────────────────────── */
+/* ── The Game Boy device. .gb-chrome + #screen are SIBLINGS so the LCD can
+      lift above the chrome on zoom while the chrome recedes independently. ─── */
 #device {
   position: relative;
   height: 92vh;
   aspect-ratio: var(--gb-aspect);
-  background-image: url(/gameboy.png);
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
+  flex: 0 0 auto;
   /* Drop shadow so the console reads as a physical object on the desk. */
   filter: drop-shadow(0 24px 40px rgba(0, 0, 0, 0.6));
-  flex: 0 0 auto;
+  /* Local em scale so all DMG detail sizes track the device height. */
+  font-size: clamp(8px, 1.35vh, 16px);
+  /* The whole console is an easy, inviting click target: click it to zoom in. */
+  cursor: zoom-in;
 }
 
-/* ── The green LCD. The Pixi canvas mounts here. ───────────────────────────── */
+/* Hover (normal state): the LCD lights up with a green halo so it clearly reads
+   as "click me to play". */
+#device:not(.zoomed):hover #screen {
+  box-shadow:
+    inset 0 0 0 1px rgba(15, 56, 15, 0.35),
+    inset 0 2px 10px rgba(15, 56, 15, 0.5),
+    inset 0 -3px 9px rgba(15, 56, 15, 0.32),
+    0 0 0 2px rgba(155, 188, 15, 0.6),
+    0 0 26px rgba(155, 188, 15, 0.45);
+}
+
+/* ── The plastic shell (everything except the lit LCD). ────────────────────── */
+.gb-chrome {
+  position: absolute;
+  inset: 0;
+  /* TL TR BR BL — the signature big sweep belongs on the bottom-RIGHT (3rd). */
+  border-radius: 0.9em 0.9em 8em 0.9em;
+  /* Edge sheen: darker on the rounded left/right sides, layered over a top-lit
+     vertical gradient so the shell reads as molded plastic catching light. */
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0) 3.5%, rgba(0, 0, 0, 0) 96.5%, rgba(0, 0, 0, 0.12) 100%),
+    linear-gradient(180deg, #e8e5db 0%, var(--gb-body-hi) 16%, var(--gb-body-lo) 74%, var(--gb-body-edge) 100%);
+  /* Molded relief: bright top inner lip + dark inner base + soft side rims. */
+  box-shadow:
+    inset 0 0.5em 0.45em -0.25em rgba(255, 255, 255, 0.85),
+    inset 0 -0.55em 0.8em -0.15em rgba(0, 0, 0, 0.32),
+    inset 0.12em 0 0.4em -0.05em rgba(255, 255, 255, 0.3),
+    inset -0.12em 0 0.4em -0.05em rgba(0, 0, 0, 0.12);
+  /* Smooth recede on zoom; origin centered so it scales toward the middle. */
+  transform-origin: center center;
+  transition:
+    opacity 380ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 380ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* Faint vertical seam/parting line near the right edge so the shell looks molded. */
+.gb-chrome::after {
+  content: "";
+  position: absolute;
+  inset: 1.1em 0.9em 1.1em auto;
+  left: auto;
+  right: 0.85em;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.28) 12%,
+    rgba(0, 0, 0, 0.12) 88%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  pointer-events: none;
+}
+
+/* ── Top-edge power switch hint. ───────────────────────────────────────────── */
+.gb-power {
+  position: absolute;
+  top: 0.55em;
+  left: 8%;
+  width: 30%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15em;
+}
+
+.gb-power-slot {
+  width: 100%;
+  height: 0.34em;
+  border-radius: 0.34em;
+  /* Thin recessed slot across the top edge. */
+  background: linear-gradient(to bottom, #a7a499, #cdcabf);
+  box-shadow:
+    inset 0 0.12em 0.2em rgba(0, 0, 0, 0.4),
+    0 0.05em 0 rgba(255, 255, 255, 0.4);
+}
+
+.gb-power-text {
+  font-size: 0.62em;
+  letter-spacing: 0.06em;
+  color: #6f6c63;
+  white-space: nowrap;
+  text-shadow: 0 0.05em 0 rgba(255, 255, 255, 0.5); /* printed into plastic */
+}
+
+/* ── Recessed charcoal screen bezel (chamfered bottom-left). ───────────────── */
+.gb-bezel {
+  position: absolute;
+  top: 6.5%;
+  left: 8%;
+  right: 8%;
+  height: 38%;
+  background: linear-gradient(155deg, var(--gb-bezel-hi) 0%, var(--gb-bezel-lo) 100%);
+  border-radius: 0.7em;
+  /* 45-degree chamfer on the bottom-LEFT corner (iconic DMG detail); the big
+     body sweep is on the bottom-RIGHT, so these heavy features sit opposite. */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 3.2em 100%, 0 calc(100% - 3.2em));
+  /* Recessed: dark inner shadow + a faint lower-right rim of reflected light. */
+  box-shadow:
+    inset 0.12em 0.12em 0.5em rgba(0, 0, 0, 0.7),
+    inset -0.08em -0.08em 0.4em rgba(255, 255, 255, 0.06),
+    0 0.06em 0 rgba(255, 255, 255, 0.35);
+}
+
+/* Power LED + BATTERY caption: a small horizontal row (red dot, then BATTERY)
+   tucked at the upper-left of the bezel, beside the top of the screen. */
+.gb-battery {
+  position: absolute;
+  left: 4%;
+  top: 14%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.3em;
+}
+
+/* LED sits FIRST in the row (DOM has the text first, so reorder it visually). */
+.gb-led {
+  order: -1;
+}
+
+.gb-battery-text {
+  font-size: 0.55em;
+  letter-spacing: 0.12em;
+  color: #b8bdc2;
+  text-shadow: 0 0.05em 0.03em rgba(0, 0, 0, 0.4); /* engraved on the charcoal */
+}
+
+.gb-led {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff8a82, var(--gb-led) 60%, #7d1410 100%);
+  box-shadow:
+    0 0 0.25em rgba(232, 68, 58, 0.7),
+    inset 0 0 0.1em rgba(0, 0, 0, 0.4);
+}
+
+/* Short ramp of diagonal accent stripes (the DMG "flag") near the chamfer. */
+.gb-stripes {
+  position: absolute;
+  left: 6%;
+  bottom: 7%;
+  width: 18%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.18em;
+  transform: rotate(-25deg);
+  transform-origin: left bottom;
+}
+
+.gb-stripe {
+  height: 0.45em;
+  border-radius: 0.45em;
+}
+
+.gb-stripe--indigo {
+  background: var(--gb-stripe-indigo);
+}
+
+.gb-stripe--magenta {
+  background: var(--gb-stripe-magenta);
+}
+
+/* "DOT MATRIX WITH STEREO SOUND" below the LCD; inset left so it clears the
+   diagonal stripe badge that sits in the bottom-left of the bezel. */
+.gb-dotmatrix {
+  position: absolute;
+  left: 26%;
+  right: 6%;
+  bottom: 7%;
+  text-align: center;
+  font-size: 0.5em;
+  letter-spacing: 0.14em;
+  color: #cdcabf; /* warm silver ink */
+  text-shadow: 0 0.06em 0.04em rgba(0, 0, 0, 0.45); /* engraved on the charcoal */
+}
+
+/* ── Wordmark on the grey body, below the bezel. The authentic "Nintendo GAME
+      BOY" lockup is an inline SVG (see index.html), recolored to the DMG navy
+      with a faint silkscreen relief so it reads as printed into the plastic. ── */
+.gb-brand {
+  position: absolute;
+  top: 49%;
+  left: 9%;
+  width: 46%;
+  color: var(--gb-navy);
+  filter:
+    drop-shadow(0 0.04em 0 rgba(255, 255, 255, 0.5))
+    drop-shadow(0 -0.02em 0.01em rgba(0, 0, 0, 0.18));
+}
+
+.gb-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* ── D-pad, lower-left. ────────────────────────────────────────────────────── */
+.gb-dpad {
+  position: absolute;
+  left: 13%;
+  bottom: 20%;
+  width: 7em;
+  height: 7em;
+}
+
+/* Subtle recessed square plate behind the molded cross. */
+.gb-dpad::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 118%;
+  height: 118%;
+  transform: translate(-50%, -50%);
+  border-radius: 0.9em;
+  background: rgba(0, 0, 0, 0.06);
+  box-shadow: inset 0 0.08em 0.3em rgba(0, 0, 0, 0.3);
+}
+
+.gb-dpad-h,
+.gb-dpad-v {
+  position: absolute;
+  background: linear-gradient(150deg, #36363c 0%, var(--gb-dark) 55%, #161619 100%);
+  border-radius: 0.18em;
+  box-shadow:
+    inset 0 0.08em 0.12em rgba(255, 255, 255, 0.12),
+    0 0.12em 0.22em rgba(0, 0, 0, 0.45);
+}
+
+/* Horizontal arm of the cross. */
+.gb-dpad-h {
+  left: 0;
+  top: 33.3%;
+  width: 100%;
+  height: 33.3%;
+}
+
+/* Vertical arm of the cross. */
+.gb-dpad-v {
+  top: 0;
+  left: 33.3%;
+  width: 33.3%;
+  height: 100%;
+}
+
+/* Subtle center dish. */
+.gb-dpad-dish {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 38%;
+  height: 38%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #2c2c31, #161619 80%);
+  box-shadow: inset 0 0.08em 0.18em rgba(0, 0, 0, 0.65);
+}
+
+/* ── A / B buttons, lower-right, on a -25deg diagonal. ─────────────────────── */
+.gb-ab {
+  position: absolute;
+  right: 11%;
+  bottom: 20%;
+  width: 10em;
+  height: 6.4em;
+  transform: rotate(-25deg);
+}
+
+.gb-btn {
+  position: absolute;
+  width: 3.5em;
+  height: 3.5em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 30%, #c9598a 0%, var(--gb-magenta) 55%, #5f1733 100%);
+  box-shadow:
+    inset 0 0.1em 0.18em rgba(255, 255, 255, 0.35),
+    inset 0 -0.12em 0.22em rgba(0, 0, 0, 0.4),
+    0 0.14em 0.28em rgba(0, 0, 0, 0.45);
+}
+
+.gb-btn--b {
+  left: 0;
+  bottom: 0;
+}
+
+.gb-btn--a {
+  right: 0;
+  top: 0;
+}
+
+.gb-ab-label {
+  position: absolute;
+  font-size: 0.8em;
+  font-weight: 800;
+  color: var(--gb-navy);
+  text-shadow: 0 0.05em 0 rgba(255, 255, 255, 0.55); /* printed into plastic */
+  /* Counter-rotate so the navy letters read upright (parent is rotated -25deg). */
+  transform: rotate(25deg);
+  transform-origin: center;
+}
+
+/* "B" tucked just below its button (which sits at left:0 bottom:0, 3.5em wide). */
+.gb-ab-label--b {
+  left: 1.1em;
+  bottom: -1.4em;
+}
+
+/* "A" tucked just below its button (which sits at right:0 top:0, 3.5em wide). */
+.gb-ab-label--a {
+  right: 1.1em;
+  top: 3.9em;
+}
+
+/* ── START / SELECT pills, center-lower, slanted -25deg. ───────────────────── */
+.gb-startsel {
+  position: absolute;
+  left: 50%;
+  bottom: 11%;
+  transform: translateX(-50%) rotate(-25deg);
+  display: flex;
+  gap: 1.1em;
+}
+
+.gb-pill {
+  width: 2.9em;
+  height: 0.95em;
+  border-radius: 0.95em;
+  background: linear-gradient(160deg, #6c6c74 0%, var(--gb-grey-btn) 60%, #3f3f45 100%);
+  /* Recessed in an oblong well: dark ring around the pill + top sheen. */
+  box-shadow:
+    inset 0 0.08em 0.12em rgba(255, 255, 255, 0.25),
+    0 0 0 0.12em rgba(0, 0, 0, 0.22),
+    0 0.12em 0.2em rgba(0, 0, 0, 0.4);
+}
+
+.gb-pill-label {
+  position: absolute;
+  top: 1.5em;
+  font-size: 0.5em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--gb-navy);
+  white-space: nowrap;
+  text-shadow: 0 0.05em 0 rgba(255, 255, 255, 0.55); /* printed into plastic */
+}
+
+.gb-pill-label--select {
+  left: -0.4em;
+}
+
+.gb-pill-label--start {
+  right: -0.2em;
+}
+
+/* ── Speaker grille, nested inside the rounded bottom-right corner. ────────── */
+.gb-speaker {
+  position: absolute;
+  right: 10%;
+  bottom: 8%;
+  width: 7em;
+  height: 5em;
+  transform: rotate(-30deg);
+  transform-origin: bottom right;
+  /* Debossed dots: repeating radial-gradient grid, slanted by the rotation. */
+  background-image: radial-gradient(
+    circle,
+    rgba(0, 0, 0, 0.42) 0 0.13em,
+    transparent 0.16em
+  );
+  background-size: 0.62em 0.62em;
+  /* Taper the dot field so the rows fade as they approach the rounded corner. */
+  -webkit-mask-image: linear-gradient(135deg, #000 55%, transparent 100%);
+  mask-image: linear-gradient(135deg, #000 55%, transparent 100%);
+  filter: drop-shadow(0 0.04em 0 rgba(255, 255, 255, 0.35));
+}
+
+/* ── The green LCD. The Pixi canvas mounts here. Click target for zoom. ────── */
 #screen {
   position: absolute;
-  left: var(--lcd-left);
-  top: var(--lcd-top);
-  width: var(--lcd-w);
-  height: var(--lcd-h);
+  /* Large glass set high in the bezel, centered horizontally (left:22% + width:56%
+     -> centered on 50%). aspect-ratio locks the box to EXACTLY 10:9 to match the
+     320:288 Pixi buffer, so the chunky pixels never stretch (height derives from
+     width — do not also set an explicit height or the ratio is ignored). */
+  top: 9.5%;
+  left: 22%;
+  width: 56%;
+  aspect-ratio: 10 / 9;
   background: var(--lcd-green);
   overflow: hidden;
+  cursor: zoom-in;
   /* The DMG glass has gently rounded corners (a touch more at the bottom). */
   border-radius: 5px 5px 9px 9px;
   /* Recessed-glass depth: thin inner rim + soft inner shadow top & bottom. */
@@ -86,6 +483,15 @@ body {
     inset 0 0 0 1px rgba(15, 56, 15, 0.35),
     inset 0 2px 10px rgba(15, 56, 15, 0.5),
     inset 0 -3px 9px rgba(15, 56, 15, 0.32);
+  /* FLIP zoom: transform is set inline by zoom.ts; transition lives here. */
+  transform-origin: center center;
+  transition: transform 380ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+
+#screen:focus-visible {
+  outline: 2px solid var(--crt-green);
+  outline-offset: 3px;
 }
 
 #screen canvas {
@@ -108,8 +514,117 @@ body {
     radial-gradient(135% 115% at 50% 0%, rgba(0, 0, 0, 0) 60%, rgba(15, 56, 15, 0.3) 100%);
 }
 
+/* Pulsing call-to-action on the LCD inviting the player to zoom in (normal
+   state). Sits low so it never blocks the agent tree; hidden once zoomed. */
+.screen-cta {
+  position: absolute;
+  left: 50%;
+  bottom: 7%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  color: #0f380f;
+  background: rgba(155, 188, 15, 0.4);
+  border: 1px solid rgba(15, 56, 15, 0.5);
+  border-radius: 10px;
+  pointer-events: none;
+  animation: cta-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes cta-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Close (X) button — only shown while zoomed (see .zoomed rules below). */
+.screen-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1;
+  color: #04121a;
+  background: rgba(207, 255, 214, 0.92);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.screen-close:hover {
+  background: #fff;
+}
+
+.screen-close-esc {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+/* ── Zoom state. zoom.ts toggles .zoomed on #device and shows the backdrop. ── */
+
+/* The backdrop lives INSIDE #app (see index.html), so #device, #mindlog and the
+   backdrop all share #app's stacking context. Lifting #device above the backdrop
+   here keeps the zoomed LCD bright (otherwise the dim overlay paints over it).
+   Order within #app: .zoom-backdrop(50) < #mindlog(55) < #device.zoomed(60). */
+#device.zoomed {
+  z-index: 60;
+  cursor: default;
+}
+
+/* While zoomed, lift the LCD above the chrome within the device. */
+#device.zoomed #screen {
+  z-index: 60;
+  cursor: default;
+}
+
+/* Reveal the close button + hide the call-to-action while zoomed. */
+#device.zoomed .screen-close {
+  display: inline-flex;
+}
+
+#device.zoomed .screen-cta {
+  display: none;
+}
+
+/* The chrome recedes (slight scale-down + fade) so focus is on the LCD. */
+#device.zoomed .gb-chrome {
+  opacity: 0.25;
+  transform: scale(0.96);
+}
+
+/* Dim backdrop behind the lifted LCD. Click it to exit (handled by zoom.ts). */
+.zoom-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(4, 6, 8, 0.72);
+  opacity: 0;
+  visibility: hidden;
+  cursor: zoom-out;
+  transition: opacity 380ms cubic-bezier(0.22, 0.61, 0.36, 1), visibility 380ms;
+}
+
+.zoom-backdrop.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* ── MIND LOG: a CRT terminal panel to the right of the console. ───────────── */
 #mindlog {
+  /* Stay above the zoom backdrop so the log remains readable while zoomed. */
+  position: relative;
+  z-index: 55;
   flex: 0 1 360px;
   align-self: center;
   height: 78vh;
@@ -126,7 +641,6 @@ body {
   font-size: 13px;
   line-height: 1.5;
   overflow: hidden;
-  position: relative;
 }
 
 /* Subtle scanline overlay for the CRT look. */
@@ -162,49 +676,83 @@ body {
   text-shadow: 0 0 6px rgba(139, 255, 155, 0.35);
 }
 
-/* ── Quest prompt bar, pinned to the bottom of the desk. ───────────────────── */
-#promptbar {
+/* ── Quest input: a Game-Boy "dialogue box" docked on the LCD while zoomed. ──
+      Hidden until zoom; zoom.ts adds .visible and positions it (fixed) over the
+      bottom of the enlarged screen, so it renders crisp (not transform-scaled). */
+.screen-prompt {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
-  display: flex;
+  z-index: 80;
+  display: none;
+  align-items: center;
   gap: 8px;
-  padding: 12px 16px;
-  background: rgba(8, 10, 14, 0.82);
-  backdrop-filter: blur(4px);
-  border-top: 1px solid #20242c;
+  padding: 8px 10px;
+  /* DMG darkest-green panel with a light-green LCD rim. */
+  background: rgba(15, 56, 15, 0.92);
+  border: 2px solid var(--lcd-green);
+  border-radius: 6px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+  font-family: inherit;
+}
+
+.screen-prompt.visible {
+  display: flex;
+}
+
+.screen-prompt-label {
+  flex: 0 0 auto;
+  color: var(--lcd-green);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.16em;
 }
 
 #prompt-input {
   flex: 1;
-  padding: 10px 12px;
-  background: #101826;
-  color: #9bd0ff;
-  border: 2px solid #48c9b0;
+  min-width: 0;
+  padding: 8px 10px;
+  background: rgba(155, 188, 15, 0.12);
+  color: #d6ef7a;
+  border: 1px solid #306230;
   border-radius: 4px;
   font-family: inherit;
   font-size: 14px;
   outline: none;
 }
 
+#prompt-input::placeholder {
+  color: #7e9a14;
+}
+
 #prompt-input:focus {
-  border-color: #6fe3cf;
-  box-shadow: 0 0 0 2px rgba(72, 201, 176, 0.25);
+  border-color: var(--lcd-green);
+  box-shadow: 0 0 0 2px rgba(155, 188, 15, 0.3);
 }
 
 #prompt-go {
-  padding: 10px 18px;
-  background: #48c9b0;
-  color: #04121a;
+  flex: 0 0 auto;
+  padding: 8px 14px;
+  background: var(--lcd-green);
+  color: #0f380f;
   border: 0;
   border-radius: 4px;
   font-family: inherit;
-  font-weight: 700;
+  font-weight: 800;
+  font-size: 14px;
   cursor: pointer;
 }
 
 #prompt-go:hover {
-  background: #6fe3cf;
+  background: #b7d52a;
+}
+
+/* ── Accessibility: honor reduced motion — snap between states, no glide. ──── */
+@media (prefers-reduced-motion: reduce) {
+  .gb-chrome,
+  #screen,
+  .zoom-backdrop {
+    transition: none !important;
+  }
+  .screen-cta {
+    animation: none !important;
+  }
 }
