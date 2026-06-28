@@ -108,9 +108,22 @@ export function reduce(state: WorldState, event: AgentEvent): WorldState {
 
   switch (event.type) {
     case "run_started":
-      return { ...next, status: "running", rootAgentId: event.rootAgentId, prompt: event.prompt };
+      // A new quest reuses the SAME hero: clear the previous run's agents and
+      // transcript so heroes/subagents from earlier prompts don't pile up and
+      // overlap. Each prompt then shows one fresh HERO tree.
+      return {
+        ...next,
+        status: "running",
+        rootAgentId: event.rootAgentId,
+        prompt: event.prompt,
+        agents: {},
+        log: [],
+      };
 
     case "agent_spawned": {
+      // Drop spawns from a superseded run: a subagent whose parent is no longer
+      // in the tree (an earlier prompt's run still emitting after a reset).
+      if (event.parentId !== null && !next.agents[event.parentId]) return next;
       const parentDepth = event.parentId ? next.agents[event.parentId]?.depth ?? 0 : 0;
       const depth = event.parentId ? parentDepth + 1 : 0;
       return {

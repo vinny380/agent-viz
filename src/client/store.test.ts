@@ -84,6 +84,34 @@ describe("store reducer", () => {
     expect(w.lastSeq).toBe(seq);
   });
 
+  it("reuses one hero across prompts: a new run resets the tree (no pile-up)", () => {
+    const w = run([
+      ev({ type: "run_started", agentId: "agent-1-root", rootAgentId: "agent-1-root", prompt: "first" }),
+      ev({ type: "agent_spawned", agentId: "agent-1-root", parentId: null, role: "orchestrator", label: "HERO" }),
+      ev({ type: "agent_spawned", agentId: "agent-1-root-sub-1", parentId: "agent-1-root", role: "subagent", label: "SCOUT" }),
+      ev({ type: "agent_finished", agentId: "agent-1-root", finalText: "done" }),
+      // Second prompt → a fresh run with a new root id.
+      ev({ type: "run_started", agentId: "agent-2-root", rootAgentId: "agent-2-root", prompt: "second" }),
+      ev({ type: "agent_spawned", agentId: "agent-2-root", parentId: null, role: "orchestrator", label: "HERO" }),
+    ]);
+    // Only the second run's hero remains — the first run's agents were cleared.
+    expect(Object.keys(w.agents)).toEqual(["agent-2-root"]);
+    expect(w.rootAgentId).toBe("agent-2-root");
+    expect(w.prompt).toBe("second");
+    expect(w.log).toEqual([]); // transcript reset for the fresh quest
+  });
+
+  it("ignores a subagent spawn whose parent is absent (superseded run)", () => {
+    const w = run([
+      ev({ type: "run_started", agentId: "r2", rootAgentId: "r2", prompt: "x" }),
+      ev({ type: "agent_spawned", agentId: "r2", parentId: null, role: "orchestrator", label: "HERO" }),
+      // A stale subagent from a previous run whose parent no longer exists.
+      ev({ type: "agent_spawned", agentId: "old-sub", parentId: "r1-root", role: "subagent", label: "GHOST" }),
+    ]);
+    expect(w.agents["old-sub"]).toBeUndefined();
+    expect(Object.keys(w.agents)).toEqual(["r2"]);
+  });
+
   it("coalesces thinking deltas into one growing think log entry", () => {
     const w = run([
       ev({ type: "agent_spawned", agentId: "a", parentId: null, role: "orchestrator", label: "H" }),
