@@ -23,8 +23,12 @@ interface Geom {
   promptBottom: number;
 }
 
+interface ZoomFeedback {
+  ui(cue: "select" | "start" | "back"): void;
+}
+
 /** Wire up zoom on the LCD element. Call once, after the canvas is mounted. */
-export function setupZoom(screenEl: HTMLElement): void {
+export function setupZoom(screenEl: HTMLElement, feedback?: ZoomFeedback): void {
   const device = screenEl.closest("#device") as HTMLElement | null;
   const backdrop = document.getElementById("zoom-backdrop");
   const closeBtn = document.getElementById("screen-close");
@@ -80,6 +84,7 @@ export function setupZoom(screenEl: HTMLElement): void {
   const enter = () => {
     if (zoomed) return; // guard against re-entering while already zoomed
     zoomed = true;
+    feedback?.ui("select");
     apply();
     device.classList.add("zoomed");
     backdrop.classList.add("visible");
@@ -94,6 +99,7 @@ export function setupZoom(screenEl: HTMLElement): void {
   const exit = (viaKeyboard = false) => {
     if (!zoomed) return;
     zoomed = false;
+    feedback?.ui("back");
     screenEl.style.transform = ""; // transition back to none
     device.classList.remove("zoomed");
     backdrop.classList.remove("visible");

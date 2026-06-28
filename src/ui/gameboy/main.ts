@@ -4,8 +4,10 @@ import { connect } from "./net";
 import { createMindLog } from "./mindlog";
 import { setupZoom } from "./zoom";
 import { initialWorld, reduce, type WorldState } from "./store";
+import { createFeedback } from "./feedback";
 
-const WS_URL = "ws://localhost:8788";
+const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+const WS_URL = env?.VITE_TRACE_WS_URL ?? "ws://127.0.0.1:8788";
 
 async function main() {
   // Fixed internal resolution: the 320x288 buffer is stretched to fill the
@@ -15,8 +17,10 @@ async function main() {
   const screen = document.getElementById("screen")!;
   screen.appendChild(app.canvas);
 
+  const feedback = createFeedback();
+
   // Click-to-focus zoom on the LCD (chrome recedes, LCD lifts above a backdrop).
-  setupZoom(screen);
+  setupZoom(screen, feedback);
 
   const scene = new Scene(app);
 
@@ -28,6 +32,7 @@ async function main() {
   mindlog.render(world);
 
   const net = connect(WS_URL, (event) => {
+    feedback.event(event);
     world = reduce(world, event);
     scene.setWorld(world);
     mindlog.render(world);
@@ -39,6 +44,7 @@ async function main() {
   const go = () => {
     const quest = input.value.trim();
     if (quest) {
+      feedback.ui("start");
       net.startRun(quest);
       input.value = "";
     }

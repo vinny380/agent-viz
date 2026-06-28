@@ -1,4 +1,4 @@
-import type { ModelClient, ModelMessage } from "./model";
+import { ANTHROPIC_MODEL, type ModelClient, type ModelMessage } from "./model";
 import type { ToolRegistry, ToolContext } from "./tools";
 import type { AgentEventInput, AgentRole } from "../shared/events";
 
@@ -38,20 +38,35 @@ export async function runAgent(deps: AgentDeps, params: RunAgentParams): Promise
     let toolUses: { id: string; name: string; input: unknown }[] = [];
     let stopReason = "end_turn";
     let stepText = "";
+    const modelCallId = `${agentId}-step-${step}-llm`;
 
-    for await (const ev of model.stream({ system: params.systemPrompt, messages, tools: tools.defs })) {
-      switch (ev.type) {
-        case "thinking_start": emit({ type: "thinking_started", agentId }); break;
-        case "thinking_delta": emit({ type: "thinking_delta", agentId, text: ev.text }); break;
-        case "thinking_stop": emit({ type: "thinking_stopped", agentId }); break;
-        case "text_delta": emit({ type: "message_delta", agentId, text: ev.text }); stepText += ev.text; break;
-        case "done":
-          assistantContent = ev.assistantContent;
-          toolUses = ev.toolUses;
-          stopReason = ev.stopReason;
-          if (ev.text) finalText = ev.text;
-          break;
+    emit({
+      type: "model_call_started",
+      agentId,
+      modelCallId,
+      provider: "anthropic",
+      model: ANTHROPIC_MODEL,
+      input: { step, messageCount: messages.length, toolCount: tools.defs.length },
+    });
+    try {
+      for await (const ev of model.stream({ system: params.systemPrompt, messages, tools: tools.defs })) {
+        switch (ev.type) {
+          case "thinking_start": emit({ type: "thinking_started", agentId }); break;
+          case "thinking_delta": emit({ type: "thinking_delta", agentId, text: ev.text }); break;
+          case "thinking_stop": emit({ type: "thinking_stopped", agentId }); break;
+          case "text_delta": emit({ type: "message_delta", agentId, text: ev.text }); stepText += ev.text; break;
+          case "done":
+            assistantContent = ev.assistantContent;
+            toolUses = ev.toolUses;
+            stopReason = ev.stopReason;
+            if (ev.text) finalText = ev.text;
+            break;
+        }
       }
+      emit({ type: "model_call_finished", agentId, modelCallId, ok: true, preview: `stop: ${stopReason}` });
+    } catch (e) {
+      emit({ type: "model_call_finished", agentId, modelCallId, ok: false, preview: e instanceof Error ? e.message : String(e) });
+      throw e;
     }
 
     if (stopReason !== "tool_use" || toolUses.length === 0) {

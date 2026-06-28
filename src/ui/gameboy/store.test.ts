@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { initialWorld, reduce, type WorldState } from "./store";
-import type { AgentEvent } from "../shared/events";
+import type { AgentEvent } from "../../shared/events";
 
 let seq = 0;
 function ev(e: Omit<AgentEvent, "seq" | "ts"> & Record<string, unknown>): AgentEvent {
@@ -45,6 +45,18 @@ describe("store reducer", () => {
     expect(w.agents.a!.phase).toBe("observing");
     expect(w.agents.a!.currentTool).toMatchObject({ name: "calculate", status: "ok", preview: "4" });
     expect(w.agents.a!.toolHistory).toHaveLength(1);
+  });
+
+  it("records model calls as thinking activity", () => {
+    const w = run([
+      ev({ type: "agent_spawned", agentId: "a", parentId: null, role: "orchestrator", label: "H" }),
+      ev({ type: "model_call_started", agentId: "a", modelCallId: "m1", provider: "openai", model: "gpt-test" }),
+      ev({ type: "model_call_finished", agentId: "a", modelCallId: "m1", ok: true, preview: "12 tokens" }),
+    ]);
+    expect(w.agents.a!.phase).toBe("thinking");
+    expect(w.log.map((entry) => entry.kind)).toEqual(["model", "result"]);
+    expect(w.log[0]!.text).toBe("LLM openai/gpt-test");
+    expect(w.log[1]).toMatchObject({ text: "12 tokens", ok: true });
   });
 
   it("resets per-step thinking text on a new loop step", () => {

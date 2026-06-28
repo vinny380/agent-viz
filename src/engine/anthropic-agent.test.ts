@@ -58,13 +58,17 @@ describe("runAgent", () => {
     expect(types).toEqual([
       "agent_spawned",
       "loop_step_started",
+      "model_call_started",
       "thinking_started",
       "thinking_delta",
       "thinking_stopped",
+      "model_call_finished",
       "tool_call_started",
       "tool_call_result",
       "loop_step_started",
+      "model_call_started",
       "message_delta",
+      "model_call_finished",
       "agent_finished",
     ]);
     const result = events.find((e) => e.type === "tool_call_result");

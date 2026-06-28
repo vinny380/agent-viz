@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentRole } from "../shared/events";
+import type { AgentEvent, AgentRole } from "../../shared/events";
 
 export type Phase = "idle" | "thinking" | "acting" | "observing" | "finished" | "error";
 
@@ -31,7 +31,7 @@ export interface LogEntry {
   agentId: string;
   label: string;
   depth: number;
-  kind: "think" | "say" | "tool" | "result" | "final" | "error";
+  kind: "think" | "say" | "model" | "tool" | "result" | "final" | "error";
   text: string;
   ok?: boolean;
 }
@@ -154,6 +154,17 @@ export function reduce(state: WorldState, event: AgentEvent): WorldState {
     case "message_delta": {
       const withText = withAgent(next, event.agentId, (a) => ({ ...a, messageText: a.messageText + event.text }));
       return appendStreaming(withText, event, "say", event.text);
+    }
+
+    case "model_call_started": {
+      const label = [event.provider, event.model].filter(Boolean).join("/");
+      const withModel = withAgent(next, event.agentId, (a) => ({ ...a, phase: "thinking" }));
+      return pushLog(withModel, makeEntry(withModel, event, "model", label ? `LLM ${label}` : "LLM call"));
+    }
+
+    case "model_call_finished": {
+      const text = event.preview ?? (event.ok ? "LLM call complete" : "LLM call failed");
+      return pushLog(next, makeEntry(next, event, "result", text, event.ok));
     }
 
     case "tool_call_started": {

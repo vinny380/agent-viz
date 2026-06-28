@@ -1,19 +1,32 @@
 {
-  "name": "agent-quest",
+  "name": "agent-viz",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "bin": {
+    "agent-viz": "bin/agent-viz.mjs"
+  },
   "scripts": {
+    "start": "node bin/agent-viz.mjs",
     "dev": "concurrently -n client,server -c blue,green \"npm:dev:client\" \"npm:dev:server\"",
     "dev:client": "vite",
-    "dev:server": "tsx watch src/runner/server.ts",
+    "dev:server": "tsx watch src/engine/server.ts",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "example:langchain": "tsx examples/langchain-agent.ts",
+    "example:anthropic": "tsx examples/anthropic-sdk-agent.ts",
+    "example:openai": "tsx examples/openai-sdk-agent.ts",
+    "example:workflow": "tsx examples/complex-workflow-agent.ts",
+    "example:debate": "tsx examples/debate-swarm-agent.ts",
+    "example:incident": "tsx examples/incident-response-agent.ts",
+    "smoke:listener-examples": "node scripts/smoke-listener-examples.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.70.0",
+    "@langchain/core": "^1.2.1",
     "dotenv": "^16.4.5",
+    "openai": "^6.45.0",
     "pixi-filters": "^6.0.0",
     "pixi.js": "^8.6.0",
     "ws": "^8.18.0"
