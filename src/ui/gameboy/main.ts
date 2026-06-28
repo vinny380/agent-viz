@@ -15,10 +15,21 @@ const QUEST_KEY = "aq.quests"; // recent quests, for HIGH SCORES
 
 const MENU_ITEMS = [
   { id: "start", label: "START GAME" },
+  { id: "examples", label: "EXAMPLES" },
   { id: "options", label: "OPTIONS" },
   { id: "highscores", label: "HIGH SCORES" },
   { id: "credits", label: "CREDITS" },
   { id: "shutdown", label: "SHUT DOWN" },
+];
+
+// Demo agents the hub can spawn on our behalf (ids must match server EXAMPLES).
+const EXAMPLES = [
+  { id: "workflow", label: "WORKFLOW" },
+  { id: "debate", label: "DEBATE SWARM" },
+  { id: "incident", label: "INCIDENT" },
+  { id: "langchain", label: "LANGCHAIN" },
+  { id: "anthropic", label: "ANTHROPIC SDK" },
+  { id: "openai", label: "OPENAI SDK" },
 ];
 
 async function main() {
@@ -47,6 +58,9 @@ async function main() {
     world = reduce(world, event);
     scene.setWorld(world);
     mindlog.render(world);
+    // A run starting (locally OR from an external producer) takes over the LCD,
+    // so a watcher sitting on the menu doesn't miss it.
+    if (event.type === "run_started") enterRunView();
   });
 
   // ── Console state machine: the LCD is either the boot MENU or the QUEST
@@ -61,15 +75,42 @@ async function main() {
   const zoom = setupZoom(screen, { onExit: returnToMenu });
   const menu = new Menu(app, MENU_ITEMS, onSelect);
 
+  // Clicking the LCD enlarges the console (and the menu with it) — it does NOT
+  // pick a menu item. Items become mouse-clickable once zoomed.
+  screen.addEventListener("click", () => {
+    if (poweredOff || zoom.zoomed) return;
+    zoom.enter();
+    menu.pointerEnabled = true;
+  });
+
   function startGame() {
+    enterRunView();
+    if (!zoom.zoomed) zoom.enter();
+    zoom.setPrompt(true); // START GAME is the only thing that opens the chat
+  }
+
+  // Switch the LCD from the menu to the agent arena. Shared by START GAME and
+  // any incoming run_started (e.g. an example launched from the menu).
+  function enterRunView() {
+    if (poweredOff) { poweredOff = false; powerOverlay.classList.remove("on"); }
     mode = "quest";
+    menu.pointerEnabled = false;
     menu.visible = false;
     scene.setArenaVisible(true);
-    zoom.enter(); // focus the quest input
+  }
+
+  function openExamples() {
+    menu.openPage({
+      title: "EXAMPLES",
+      items: EXAMPLES,
+      onItem: (id) => net.runExample(id), // run_started will flip us to the arena
+    });
   }
 
   function returnToMenu() {
     mode = "menu";
+    zoom.setPrompt(false);
+    menu.pointerEnabled = false;
     if (zoom.zoomed) zoom.exit();
     scene.setArenaVisible(false);
     menu.visible = true;
@@ -117,6 +158,7 @@ async function main() {
 
   function onSelect(id: string) {
     if (id === "start") startGame();
+    else if (id === "examples") openExamples();
     else if (id === "options") openOptions();
     else if (id === "highscores") openHighScores();
     else if (id === "credits") openCredits();

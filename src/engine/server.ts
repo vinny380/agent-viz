@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { WebSocketServer, WebSocket } from "ws";
+import { spawn } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +23,29 @@ You have tools: calculate, list_files, read_file. When you are finished, give a 
 
 const SUBAGENT_SYSTEM = `You are a Scout, a focused subagent. Complete the single task you are given
 using the available tools, then return a concise result for your commander.`;
+
+// Examples runnable from the viewer menu. Whitelisted id -> file so a WS
+// message can't spawn an arbitrary command. Each runs as its own producer,
+// connecting back to this hub via AGENT_VIZ_URL and streaming its trace.
+const EXAMPLES: Record<string, string> = {
+  workflow: "complex-workflow-agent.ts",
+  debate: "debate-swarm-agent.ts",
+  incident: "incident-response-agent.ts",
+  langchain: "langchain-agent.ts",
+  anthropic: "anthropic-sdk-agent.ts",
+  openai: "openai-sdk-agent.ts",
+};
+
+function runExample(id: string): void {
+  const file = EXAMPLES[id];
+  if (!file) return;
+  const tsx = join(process.cwd(), "node_modules", ".bin", "tsx");
+  const child = spawn(tsx, [join("examples", file)], {
+    env: { ...process.env, AGENT_VIZ_URL: `ws://${HOST}:${PORT}` },
+    stdio: "inherit",
+  });
+  child.on("error", (e) => console.error(`example ${id} failed to start:`, e));
+}
 
 function makeSandbox(): string {
   const dir = mkdtempSync(join(tmpdir(), "agent-quest-"));
@@ -99,6 +123,8 @@ wss.on("connection", (socket: WebSocket) => {
     try { msg = JSON.parse(raw.toString()) as ClientMessage; } catch { return; }
     if (msg.type === "start_run" && typeof msg.prompt === "string") {
       await handleDemoRun(msg.prompt);
+    } else if (msg.type === "run_example" && typeof msg.id === "string") {
+      runExample(msg.id);
     } else if (msg.type === "trace_event" && isAgentEventInput(msg.event)) {
       emit(msg.event);
     } else if (msg.type === "trace_events" && Array.isArray(msg.events)) {

@@ -44,6 +44,7 @@ export type AgentEventInput = DistributiveOmit<AgentEvent, "seq" | "ts">;
 
 export type ClientMessage =
   | { type: "start_run"; prompt: string }
+  | { type: "run_example"; id: string }
   | { type: "trace_event"; event: AgentEventInput }
   | { type: "trace_events"; events: AgentEventInput[] };
 
